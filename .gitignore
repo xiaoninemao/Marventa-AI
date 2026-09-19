@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.venv/
+.*-venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Builds
+.next/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!frontend/.env.local.example
+!backend/.env.example
+
+# Runtime data
+backend/data/
+logs/
+*.db
+*.sqlite
+*.log
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

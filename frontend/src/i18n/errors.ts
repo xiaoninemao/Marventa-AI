@@ -1,0 +1,158 @@
+import { DEFAULT_LOCALE, type Locale } from "./locale";
+
+const messages: ReadonlyArray<readonly [string, string]> = [
+  ["组织名称不能为空", "Organization name is required"],
+  ["组织名称不能超过 80 个字符", "Organization name must be at most 80 characters"],
+  ["组织不存在或你没有访问权限", "Organization not found"],
+  ["只有组织所有者可以修改组织名称", "Only organization owners can rename organizations"],
+  ["无法读取组织列表", "Could not load organizations"],
+  ["无法创建组织", "Could not create organization"],
+  ["无法修改组织名称", "Could not rename organization"],
+  ["无法切换组织", "Could not switch organization"],
+  ["无法读取组织", "Could not load organization"],
+  ["无法添加组织成员", "Could not add organization member"],
+  ["无法更新成员权限", "Could not update member permissions"],
+  ["请输入邮箱", "Email is required"],
+  ["请输入有效的邮箱", "A valid email is required"],
+  ["用户不存在", "User not found"],
+  ["该用户已经是组织成员", "User is already an organization member"],
+  ["组织成员不存在", "Organization member not found"],
+  ["只有组织所有者可以管理成员", "Only organization owners can manage members"],
+  ["不能修改组织所有者的权限", "The organization owner's role cannot be changed"],
+  ["成员权限必须是管理员或成员", "Member role must be admin or member"],
+  ["组织正在更新，请稍后重试", "An organization update is already in progress"],
+  ["默认组织暂不可用，请稍后重试", "Default organization is unavailable"],
+  ["账号不能为空", "Username is required"],
+  ["该账号已被注册", "This username is already registered"],
+  ["该邮箱已被注册", "This email address is already registered"],
+  ["邮箱不能为空", "Email is required"],
+  ["邮箱格式不正确", "Enter a valid email address"],
+  ["密码至少需要6个字符", "Password must contain at least 6 characters"],
+  ["账号或密码错误", "Invalid credentials"],
+  ["请填写账号和密码", "Username/email and password are required"],
+  ["请填写邮箱和密码", "Email and password are required"],
+  ["邮箱和密码不能为空", "Email and password are required"],
+  ["未登录或登录已过期", "Unauthorized"],
+  ["登录凭证已失效", "Invalid token"],
+  ["没有访问权限", "Access denied"],
+  ["登录失败", "Login failed"],
+  ["注册失败", "Registration failed"],
+  ["更新失败", "Update failed"],
+  ["删除失败", "Delete failed"],
+  ["创建失败", "Create failed"],
+  ["解析失败", "Parse failed"],
+  ["仓库解析失败", "Repository parse failed"],
+  ["记录不存在", "Record not found"],
+  ["案例不存在", "Case not found"],
+  ["账号不存在", "Account not found"],
+  ["内容卡片不存在", "Card not found"],
+  ["作品不存在", "Script not found"],
+  ["对话不存在", "Session not found"],
+  ["项目不存在", "Project not found"],
+  ["任务不存在", "Task not found"],
+  ["版本不存在", "Version not found"],
+  ["账号记忆不存在", "Memory not found"],
+  ["导入任务不存在", "Import task not found"],
+  ["未选择文件", "No file selected"],
+  ["不支持该平台", "Unsupported platform"],
+  ["图文案例至少需要一张图片", "At least one image is required for image_text cases"],
+  ["视频案例需要上传视频文件", "Video file is required for video cases"],
+  ["图片不能超过18张", "Images cannot exceed 18"],
+  ["没有可用于生成文档的内容卡片", "No cards to generate document from"],
+  ["对话中没有消息", "No messages in session"],
+  ["AI 分析正在进行中", "AI analysis is already in progress"],
+  ["只支持收藏行业精选案例", "Only curated cases can be favorited"],
+  ["只能修改自己的案例", "You can only modify your own cases"],
+  ["只能查看自己的导入任务", "You can only view your own import tasks"],
+  ["请先登录并保存该平台账号", "Please login and save this platform account first"],
+  ["请输入分享内容或手动正文", "Input or manual_text is required"],
+  ["请输入仓库地址", "repo_url is required"],
+  ["分类必须为企业精选或行业精选", "category must be 'agency' or 'curated'"],
+  ["内容类型必须为视频或图文", "content_type must be 'video' or 'image_text'"],
+  ["案例读取失败", "Failed to fetch cases"],
+  ["收藏读取失败", "Failed to fetch favorites"],
+  ["链接解析失败", "Parse link failed"],
+  ["导入任务创建失败", "Import task failed"],
+  ["案例创建失败", "Create case failed"],
+  ["案例更新失败", "Update case failed"],
+  ["更新案例失败", "Failed to update case"],
+  ["案例媒体更新失败", "Failed to update case media"],
+  ["替换素材失败", "Replace media failed"],
+  ["案例删除失败", "Delete case failed"],
+  ["收藏失败", "Favorite failed"],
+  ["取消收藏失败", "Unfavorite failed"],
+  ["分析失败", "Analyze failed"],
+  ["创建对话失败", "Create session failed"],
+  ["对话列表读取失败", "Fetch sessions failed"],
+  ["对话读取失败", "Fetch session failed"],
+  ["更新对话失败", "Failed to update session"],
+  ["发送消息失败", "Send message failed"],
+  ["设置参考资料失败", "Set references failed"],
+  ["生成失败", "Generate failed"],
+  ["修改内容卡片失败", "Modify card failed"],
+  ["删除对话失败", "Delete session failed"],
+  ["生成文档失败", "Generate document failed"],
+  ["版本读取失败", "Fetch versions failed"],
+  ["恢复版本失败", "Restore version failed"],
+  ["版本恢复失败", "Failed to restore version"],
+  ["作品列表读取失败", "Fetch scripts failed"],
+  ["作品读取失败", "Fetch script failed"],
+  ["更新作品失败", "Update script failed"],
+  ["删除作品失败", "Delete script failed"],
+  ["保存项目失败", "Save project failed"],
+  ["创建手动项目失败", "Create manual project failed"],
+  ["项目读取失败", "Fetch projects failed"],
+  ["项目素材上传失败", "Upload project media failed"],
+  ["项目素材删除失败", "Delete project media failed"],
+  ["创建发布任务失败", "Create publish task failed"],
+  ["发布任务列表读取失败", "Fetch publish tasks failed"],
+  ["发布任务读取失败", "Fetch publish task failed"],
+  ["更新发布任务失败", "Update publish task failed"],
+  ["效果指标读取失败", "Fetch metric failed"],
+  ["保存效果指标失败", "Save metric failed"],
+  ["复盘读取失败", "Fetch review failed"],
+  ["发布失败", "Publish failed"],
+  ["账号列表读取失败", "Could not load platform accounts"],
+  ["打开平台登录窗口失败", "Could not open the platform login window"],
+  ["识别账号失败", "Could not identify the account"],
+  ["保存登录态失败", "Could not save the login state"],
+  ["更新账号失败", "Update account failed"],
+  ["导入账号失败", "Import account failed"],
+  ["生成复盘失败", "Generate review failed"],
+  ["账号记忆读取失败", "Fetch account memories failed"],
+  ["保存账号记忆失败", "Save account memory failed"],
+  ["读取超时，请稍后重试，或粘贴正文后使用半自动识别。", "The request timed out. Try again later, or paste the post text for assisted import."],
+  ["暂仅支持小红书和抖音链接", "Only Xiaohongshu and Douyin links are currently supported"],
+  ["未读取到登录态，请先在打开的窗口完成平台登录", "No login state was found. Complete platform sign-in in the opened window first."],
+  ["登录窗口会话已失效，请重新打开平台快速登录", "The platform login session has expired. Open a new login window."],
+  ["AI 生成失败，请检查后端日志。", "AI generation failed. Check the backend logs."],
+  ["AI 鉴权失败，请检查 backend/.env 里的 CASE_AI_API_KEY 是否有效。", "AI authentication failed. Check CASE_AI_API_KEY in backend/.env."],
+  ["无法连接 AI 服务，请检查 CASE_AI_BASE_URL 和网络。", "Could not connect to the AI service. Check CASE_AI_BASE_URL and the network connection."],
+  ["网络请求失败，请检查连接", "Failed to fetch"],
+];
+
+export function localizeErrorMessage(value: unknown, locale: Locale): string {
+  if (Array.isArray(value)) return value.map((item) => localizeErrorMessage(item, locale)).join("; ");
+  if (value && typeof value === "object" && "msg" in value) return localizeErrorMessage(value.msg, locale);
+  if (typeof value !== "string") {
+    console.warn("Unexpected API error message type:", typeof value);
+    return locale === "en" ? "The request failed. Check the server logs for details." : "请求失败，请检查服务端日志。";
+  }
+  const entry = messages.find(([zh, en]) => value === zh || value === en);
+  if (entry) return locale === "en" ? entry[1] : entry[0];
+  if (locale !== "en") return value;
+  return value
+    .replace(/^无法连接后端服务：(.+)。请确认后端已启动。$/, "Could not connect to the backend at $1. Make sure the backend is running.")
+    .replace(/^AI 服务返回错误 (.+)，请检查模型名、额度或服务状态。$/, "The AI service returned error $1. Check the model name, quota, and service status.")
+    .replace(/^无法读取公开页面元信息：/, "Could not read public page metadata: ")
+    .replace(/^读取登录态失败：/, "Could not read the login state: ");
+}
+
+export function currentInterfaceLocale(): Locale {
+  if (typeof document === "undefined") return DEFAULT_LOCALE;
+  return document.documentElement.lang === "en" ? "en" : DEFAULT_LOCALE;
+}
+
+export function apiError(message: unknown): Error {
+  return new Error(localizeErrorMessage(message, currentInterfaceLocale()));
+}

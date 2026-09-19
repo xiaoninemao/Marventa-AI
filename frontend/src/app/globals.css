@@ -1,0 +1,75 @@
+@import "tailwindcss";
+@import "../styles/redesign.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "DM Sans", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Space Grotesk", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-body: "DM Sans", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+button:not(:disabled),
+a[href],
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+    transition-duration: 160ms;
+    transition-timing-function: ease;
+  }
+
+  button:not(:disabled):hover,
+  [role="button"]:not([aria-disabled="true"]):hover {
+    transform: translateY(-1px);
+  }
+
+  button:not(:disabled):active,
+  [role="button"]:not([aria-disabled="true"]):active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  a[href] {
+    transition-property: color, opacity, text-decoration-color, background-color, border-color, box-shadow, transform;
+    transition-duration: 160ms;
+    transition-timing-function: ease;
+  }
+}
+
+.amp-anchor-section {
+  scroll-margin-top: 96px;
+}
