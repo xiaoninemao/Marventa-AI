@@ -10,6 +10,7 @@ from app.api.content_generator import router as content_generator_router
 from app.api.portfolio import router as portfolio_router
 from app.api.publishing import router as publishing_router
 from app.api.organizations import router as organizations_router
+from app.api.notifications import router as notifications_router
 from app.auth.seed import ensure_demo_user
 from app.auth.storage import init_users_db
 from app.config import APP_NAME, DEBUG, ENABLE_DEMO_USER, FRONTEND_ORIGINS, MEDIA_ROOT
@@ -19,6 +20,7 @@ from app.engines.content_generator.storage import init_db as init_content_genera
 from app.engines.market_insight.storage import init_db as init_market_insight_db
 from app.engines.portfolio.storage import init_db as init_portfolio_db
 from app.engines.publishing.storage import init_db as init_publishing_db
+from app.notifications.storage import init_notifications_db
 
 app = FastAPI(
     title=APP_NAME,
@@ -38,6 +40,7 @@ app.add_middleware(
 os.makedirs(os.path.join(MEDIA_ROOT, "videos"), exist_ok=True)
 os.makedirs(os.path.join(MEDIA_ROOT, "images"), exist_ok=True)
 init_users_db()
+init_notifications_db()
 init_market_insight_db()
 init_case_library_db()
 init_import_tasks_db()
@@ -55,6 +58,7 @@ app.include_router(content_generator_router)
 app.include_router(portfolio_router)
 app.include_router(publishing_router)
 app.include_router(organizations_router)
+app.include_router(notifications_router)
 
 
 @app.get("/")

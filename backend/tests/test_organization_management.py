@@ -1,3 +1,4 @@
+import base64
 import sqlite3
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ from app.api.auth import router as auth_router
 from app.api.organizations import router as organization_router
 from app.auth import storage
 from app.auth.security import create_access_token, hash_password
+from app import media_storage
 
 
 class OrganizationManagementTests(unittest.TestCase):
@@ -19,6 +21,8 @@ class OrganizationManagementTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.db_path = str(Path(directory.name) / "organizations.db")
         self.enterContext(patch.object(storage, "DB_PATH", self.db_path))
+        self.media_root = Path(directory.name) / "media"
+        self.enterContext(patch.object(media_storage, "MEDIA_ROOT", str(self.media_root)))
         self.owner = storage.create_user("owner", "", "test-hash")
         self.other = storage.create_user("other", "other@example.com", "test-hash")
         self.app = FastAPI()
@@ -68,7 +72,57 @@ class OrganizationManagementTests(unittest.TestCase):
         self.assertEqual(organization["role"], "owner")
         self.assertEqual(organization["member_count"], 1)
         self.assertFalse(organization["is_default"])
+        self.assertEqual(organization["avatar_url"], "")
         self.assertEqual(storage.get_current_organization(self.owner["id"])["id"], before)
+
+    def test_owner_can_upload_organization_avatar(self):
+        organization = self.create()
+        png = b"\x89PNG\r\n\x1a\n" + b"organization-avatar"
+        response = self.client.patch(
+            f"/api/v1/organizations/{organization['id']}",
+            headers=self.headers,
+            json={"avatar_url": f"data:image/png;base64,{base64.b64encode(png).decode()}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        avatar_url = response.json()["data"]["avatar_url"]
+        self.assertRegex(
+            avatar_url,
+            rf"^http://testserver/media/organization-avatars/{organization['id']}/[a-f0-9]{{24}}\.png$",
+        )
+        stored = list((self.media_root / "organization-avatars" / organization["id"]).glob("*.png"))
+        self.assertEqual(len(stored), 1)
+        self.assertEqual(stored[0].read_bytes(), png)
+        self.assertEqual(
+            storage.get_organization(self.owner["id"], organization["id"])["avatar_url"],
+            avatar_url,
+        )
+
+    def test_member_cannot_upload_organization_avatar(self):
+        organization = self.create()
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "INSERT INTO organization_memberships VALUES (?, ?, 'member', '2026-01-01')",
+                (organization["id"], self.other["id"]),
+            )
+        response = self.client.patch(
+            f"/api/v1/organizations/{organization['id']}",
+            headers=self.headers_for(self.other["id"]),
+            json={"avatar_url": "https://example.com/avatar.png"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(storage.get_organization(self.owner["id"], organization["id"])["avatar_url"], "")
+        self.assertFalse(self.media_root.exists())
+
+    def test_organization_avatar_rejects_invalid_image_data(self):
+        organization = self.create()
+        invalid = base64.b64encode(b"not-a-png").decode()
+        response = self.client.patch(
+            f"/api/v1/organizations/{organization['id']}",
+            headers=self.headers,
+            json={"avatar_url": f"data:image/png;base64,{invalid}"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Invalid organization image")
 
     def test_list_contains_only_memberships(self):
         own = self.create()

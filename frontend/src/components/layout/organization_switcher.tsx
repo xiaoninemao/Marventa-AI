@@ -7,8 +7,9 @@ import { useI18n } from "@/contexts/i18n_context";
 import { useToast } from "@/contexts/toast_context";
 import { useDropdownMenu } from "@/hooks/use_dropdown_menu";
 import { localizeErrorMessage } from "@/i18n/errors";
-import { organizationName, organizationRole } from "@/utils/organizations";
+import { organizationName } from "@/utils/organizations";
 import InlineIcon from "@/components/redesign/InlineIcon";
+import OrganizationAvatar from "@/components/layout/organization_avatar";
 
 export default function OrganizationSwitcher() {
   const { user, organizations, organizationsLoading, organizationsError, organizationBusy, reloadOrganizations, switchOrganization } = useAuth();
@@ -17,7 +18,7 @@ export default function OrganizationSwitcher() {
   const current = user?.current_organization ?? user?.default_organization;
   const name = current ? organizationName(current, t) : t("组织", "Organization");
   const count = organizationsLoading ? 0 : organizationsError ? 1 : organizations.length;
-  const { open, position, triggerRef, menuRef, menuId, toggleMenu, closeMenu, handleTriggerKeyDown, handleMenuKeyDown } = useDropdownMenu(count);
+  const { open, position, triggerRef, menuRef, menuId, toggleMenu, closeMenu, handleTriggerKeyDown, handleMenuKeyDown } = useDropdownMenu(count, "start");
 
   useEffect(() => {
     if (organizationsError) showError(localizeErrorMessage(organizationsError, locale));
@@ -43,7 +44,7 @@ export default function OrganizationSwitcher() {
         aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
         onClick={() => toggleMenu(Math.max(0, organizations.findIndex((item) => item.id === current?.id)))}
         onKeyDown={handleTriggerKeyDown}>
-        <InlineIcon name="organization" className="amp-organization-symbol" />
+        {current && <OrganizationAvatar organization={current} className="amp-organization-avatar h-9 w-9 text-sm" />}
         <span className="amp-app-brand-text">{name}</span>
         <svg className="amp-organization-chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
           <path d="m5 8 5 5 5-5" />
@@ -62,7 +63,8 @@ export default function OrganizationSwitcher() {
                 aria-checked={current?.id === item.id} disabled={organizationBusy}
                 className="amp-language-option amp-organization-option" title={organizationName(item, t)}
                 onClick={() => { if (current?.id === item.id) closeMenu(); else void selectOrganization(item.id); }}>
-                <span><strong>{organizationName(item, t)}</strong><small>{organizationRole(item.role, t)}</small></span>
+                <OrganizationAvatar organization={item} className="h-10 w-10 text-sm" />
+                <span className="amp-organization-option-copy"><strong>{organizationName(item, t)}</strong></span>
                 {current?.id === item.id && <InlineIcon name="check" />}
               </button>
               ))}

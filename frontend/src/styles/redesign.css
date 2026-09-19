@@ -894,15 +894,18 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   background: #f7faff;
   color: var(--amp-text-main);
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: 72px minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
-  transition: grid-template-columns 180ms ease;
   width: 100%;
 }
 
-.amp-redesign.amp-app-shell-collapsed {
+.amp-redesign .amp-app-body {
+  display: grid;
   grid-template-columns: 76px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
 }
 
 .amp-redesign .amp-app-sidebar {
@@ -913,32 +916,28 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   min-width: 0;
   overflow: hidden;
   padding: 22px 14px;
+  position: relative;
+  transition: box-shadow 180ms ease, width 180ms ease;
+  width: 76px;
+  z-index: 20;
 }
 
-.amp-redesign .amp-app-sidebar-head {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  min-height: 44px;
-  position: relative;
-  flex-shrink: 0;
+.amp-redesign.amp-app-shell-expanded .amp-app-sidebar {
+  box-shadow: 12px 0 28px rgba(16, 24, 40, 0.14);
+  width: 260px;
 }
 
 .amp-redesign .amp-app-sidebar > .amp-dashboard-nav {
   align-content: start;
   flex: 1;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 0;
+  margin-top: 0;
   margin-bottom: 12px;
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: thin;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-app-sidebar-head {
-  align-items: center;
-  justify-content: flex-start;
-  min-height: 44px;
+  width: 100%;
 }
 
 .amp-redesign .amp-app-brand {
@@ -952,19 +951,25 @@ html[lang="en"] .amp-redesign .amp-hero-title {
 }
 
 .amp-redesign .amp-organization-switcher {
-  flex: 1;
+  flex: 0 1 auto;
+  max-width: 320px;
   min-width: 0;
+}
+
+.amp-redesign .amp-app-topbar > .amp-organization-switcher {
+  margin-right: auto;
 }
 
 .amp-redesign .amp-organization-trigger {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  gap: 8px;
+  gap: 10px;
   justify-content: flex-start;
-  min-height: 40px;
-  padding: 4px;
-  width: 100%;
+  min-height: 48px;
+  padding: 4px 10px 4px 5px;
+  max-width: 100%;
+  width: auto;
 }
 
 .amp-redesign .amp-organization-trigger .amp-app-brand-text {
@@ -975,6 +980,7 @@ html[lang="en"] .amp-redesign .amp-hero-title {
 .amp-redesign .amp-organization-trigger:hover,
 .amp-redesign .amp-organization-trigger[aria-expanded="true"] {
   background: transparent;
+  border-color: transparent;
   transform: none;
 }
 
@@ -983,23 +989,27 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   outline-offset: 2px;
 }
 
-.amp-redesign .amp-organization-symbol {
-  display: none;
-  height: 20px;
-  width: 20px;
+.amp-redesign .amp-organization-avatar {
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .amp-redesign .amp-organization-chevron {
   flex-shrink: 0;
-  height: 16px;
-  width: 16px;
+  height: 18px;
+  transition: transform 160ms ease;
+  width: 18px;
+}
+
+.amp-redesign .amp-organization-trigger[aria-expanded="true"] .amp-organization-chevron {
+  transform: rotate(180deg);
 }
 
 .amp-redesign.amp-language-menu.amp-organization-menu {
   max-height: min(420px, calc(100dvh - 16px));
   max-width: calc(100vw - 16px);
   overflow-y: auto;
-  width: 280px;
+  padding: 10px;
+  width: 340px;
 }
 
 .amp-redesign .amp-organization-menu-message {
@@ -1013,23 +1023,46 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   color: #dc2626;
 }
 
-.amp-redesign .amp-organization-option > span {
-  display: grid;
-  gap: 4px;
+.amp-redesign .amp-organization-option-copy {
   min-width: 0;
+  text-align: left;
 }
 
 .amp-redesign .amp-organization-option strong {
-  font-size: 13px;
-  font-weight: 600;
+  color: #344054;
+  font-size: 15px;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.amp-redesign .amp-organization-option small {
-  color: #64748b;
-  font-size: 11px;
+.amp-redesign .amp-organization-option {
+  gap: 14px;
+  justify-content: flex-start;
+  min-height: 64px;
+  padding: 10px 14px;
+}
+
+.amp-redesign .amp-organization-option[aria-checked="true"] {
+  background: transparent;
+  color: #344054;
+}
+
+.amp-redesign .amp-organization-option:hover,
+.amp-redesign .amp-organization-option:focus {
+  background: #f2f4f7;
+}
+
+.amp-redesign .amp-organization-option[aria-checked="true"]:focus {
+  background: transparent;
+}
+
+.amp-redesign .amp-organization-option > svg {
+  color: #344054;
+  height: 20px;
+  margin-left: auto;
+  width: 20px;
 }
 
 .amp-redesign .amp-organization-option:disabled {
@@ -1037,36 +1070,12 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   opacity: 0.55;
 }
 
-.amp-redesign.amp-app-shell-collapsed .amp-organization-switcher {
-  flex: none;
-  width: 48px;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-organization-trigger {
-  gap: 0;
-  justify-content: center;
-  transition: opacity 120ms ease;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-organization-symbol {
-  display: block;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-organization-chevron {
-  display: none;
-}
-
 .amp-redesign .amp-app-brand-text {
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
-.amp-redesign.amp-app-shell-collapsed .amp-app-brand {
-  justify-content: center;
-  width: 48px;
-}
-
-.amp-redesign .amp-app-brand-text,
 .amp-redesign .amp-app-nav-label,
 .amp-redesign .amp-dashboard-nav-badge {
   overflow: hidden;
@@ -1075,7 +1084,6 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   white-space: nowrap;
 }
 
-.amp-redesign.amp-app-shell-collapsed .amp-app-brand-text,
 .amp-redesign.amp-app-shell-collapsed .amp-app-nav-label,
 .amp-redesign.amp-app-shell-collapsed .amp-dashboard-nav-badge {
   opacity: 0;
@@ -1113,7 +1121,7 @@ html[lang="en"] .amp-redesign .amp-hero-title {
 
 .amp-redesign.amp-app-shell-collapsed .amp-dashboard-nav {
   align-items: center;
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .amp-redesign.amp-app-shell-collapsed .amp-dashboard-sidebar-bottom {
@@ -1145,62 +1153,6 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   justify-content: center;
   min-width: 44px;
   transition: background 180ms ease, border-color 180ms ease, color 180ms ease;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-app-icon-button {
-  width: 48px;
-}
-
-.amp-redesign .amp-sidebar-toggle {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: transparent;
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.72);
-  height: 32px;
-  min-width: 32px;
-  width: 32px;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-sidebar-toggle {
-  left: 8px;
-  min-width: 32px;
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  top: 6px;
-  width: 32px;
-  z-index: 2;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-app-sidebar-head:hover .amp-organization-trigger {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.amp-redesign.amp-app-shell-collapsed .amp-app-sidebar-head:hover .amp-sidebar-toggle,
-.amp-redesign.amp-app-shell-collapsed .amp-sidebar-toggle:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.amp-redesign .amp-app-icon-button.amp-sidebar-toggle:hover {
-  background: rgba(255, 255, 255, 0.11);
-  border-color: transparent;
-  color: #ffffff;
-}
-
-.amp-redesign .amp-sidebar-toggle-action {
-  display: none;
-}
-
-.amp-redesign .amp-sidebar-toggle:hover .amp-sidebar-toggle-rest,
-.amp-redesign .amp-sidebar-toggle:focus-visible .amp-sidebar-toggle-rest {
-  display: none;
-}
-
-.amp-redesign .amp-sidebar-toggle:hover .amp-sidebar-toggle-action,
-.amp-redesign .amp-sidebar-toggle:focus-visible .amp-sidebar-toggle-action {
-  display: block;
 }
 
 .amp-redesign.amp-nav-light .amp-app-sidebar {
@@ -1236,18 +1188,6 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   color: #2563eb;
 }
 
-.amp-redesign.amp-nav-light .amp-sidebar-toggle {
-  background: rgba(37, 99, 255, 0.06);
-  border-color: transparent;
-  color: rgba(37, 99, 255, 0.7);
-}
-
-.amp-redesign.amp-nav-light .amp-sidebar-toggle:hover {
-  background: rgba(37, 99, 255, 0.1);
-  border-color: transparent;
-  color: var(--amp-primary);
-}
-
 .amp-redesign .amp-app-icon-button:hover {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.22);
@@ -1268,32 +1208,18 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   gap: 12px;
   height: 72px;
   justify-content: flex-end;
-  padding: 0 28px;
-  position: sticky;
-  top: 0;
-  z-index: 30;
-}
-
-.amp-redesign .amp-app-topbar-title {
-  color: #101828;
-  font-size: 18px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
-  margin-right: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 0 28px 0 14px;
+  position: relative;
+  z-index: 40;
 }
 
 .amp-redesign .amp-app-quick-search {
   left: 50%;
-  max-width: 360px;
+  max-width: 480px;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(34vw, 360px);
+  width: min(42vw, 480px);
 }
 
 .amp-redesign .amp-app-quick-search .amp-input {
@@ -1354,10 +1280,6 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-.amp-redesign.amp-nav-dark .amp-app-topbar-title {
-  color: #ffffff;
-}
-
 .amp-redesign.amp-nav-dark .amp-app-topbar-action,
 .amp-redesign.amp-nav-dark .amp-app-theme-button {
   color: #d8deec;
@@ -1404,6 +1326,193 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   min-width: 44px;
   padding: 0;
   width: 44px;
+}
+
+.amp-redesign .amp-notification-center {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.amp-redesign .amp-notification-trigger {
+  position: relative;
+}
+
+.amp-redesign .amp-notification-badge {
+  align-items: center;
+  background: #dc2626;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 800;
+  height: 18px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 18px;
+  padding: 0 3px;
+  position: absolute;
+  right: 1px;
+  top: 1px;
+}
+
+.amp-redesign .amp-notification-menu {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(16, 24, 40, 0.16);
+  color: #344054;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+  width: 380px;
+  z-index: 100;
+}
+
+.amp-redesign .amp-notification-menu-header {
+  align-items: center;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  justify-content: space-between;
+  min-height: 54px;
+  padding: 0 16px;
+}
+
+.amp-redesign .amp-notification-menu-header strong {
+  color: #101828;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.amp-redesign .amp-notification-menu-header button {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.amp-redesign .amp-notification-menu-header button:hover {
+  color: #1d4ed8;
+  transform: none;
+}
+
+.amp-redesign .amp-notification-list {
+  max-height: min(480px, calc(100dvh - 100px));
+  overflow-y: auto;
+}
+
+.amp-redesign .amp-notification-item {
+  align-items: flex-start;
+  border-bottom: 1px solid #f2f4f7;
+  display: flex;
+  gap: 12px;
+  min-height: 94px;
+  padding: 14px 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.amp-redesign .amp-notification-item:last-child {
+  border-bottom: 0;
+}
+
+.amp-redesign .amp-notification-item:hover,
+.amp-redesign .amp-notification-item:focus-visible {
+  background: #f8fafc;
+  transform: none;
+}
+
+.amp-redesign .amp-notification-item-unread {
+  background: #f5f8ff;
+}
+
+.amp-redesign .amp-notification-item-icon {
+  align-items: center;
+  background: #dbeafe;
+  border-radius: 9px;
+  color: #1d4ed8;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.amp-redesign .amp-notification-item-icon svg {
+  height: 18px;
+  width: 18px;
+}
+
+.amp-redesign .amp-notification-item-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.amp-redesign .amp-notification-item-copy strong {
+  color: #101828;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.amp-redesign .amp-notification-item-copy > span {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.amp-redesign .amp-notification-item-copy time {
+  color: #98a2b3;
+  font-size: 11px;
+}
+
+.amp-redesign .amp-notification-unread-dot {
+  background: #2563eb;
+  border-radius: 999px;
+  flex-shrink: 0;
+  height: 7px;
+  margin-top: 7px;
+  width: 7px;
+}
+
+.amp-redesign .amp-notification-state,
+.amp-redesign .amp-notification-empty {
+  align-items: center;
+  color: #667085;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: center;
+  min-height: 180px;
+  padding: 24px;
+  text-align: center;
+}
+
+.amp-redesign .amp-notification-state button {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.amp-redesign .amp-notification-empty svg {
+  color: #98a2b3;
+  height: 24px;
+  width: 24px;
+}
+
+.amp-redesign .amp-notification-empty strong {
+  color: #344054;
+  font-size: 14px;
+}
+
+.amp-redesign .amp-notification-empty span {
+  color: #98a2b3;
+}
+
+.amp-redesign.amp-nav-dark .amp-notification-badge {
+  border-color: #071633;
 }
 
 .amp-redesign .amp-app-theme-button {
@@ -1962,7 +2071,7 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   font-weight: 700;
   gap: 10px;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 14px 0 12px;
   text-decoration: none;
 }
 
@@ -1987,6 +2096,7 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   flex-shrink: 0;
   gap: 6px;
   margin-top: auto;
+  width: 100%;
 }
 
 .amp-redesign .amp-dashboard-grid {
@@ -2036,20 +2146,6 @@ html[lang="en"] .amp-redesign .amp-hero-title {
 }
 
 @media (max-width: 768px) {
-  .amp-redesign .amp-app-sidebar-head {
-    flex-direction: column;
-    min-height: 98px;
-  }
-
-  .amp-redesign.amp-app-shell-collapsed .amp-app-sidebar-head {
-    flex-direction: row;
-    min-height: 44px;
-  }
-
-  .amp-redesign.amp-app-shell-collapsed .amp-sidebar-toggle {
-    left: 6px;
-  }
-
   .amp-redesign .amp-organization-switcher {
     flex: none;
     width: 44px;
@@ -2058,15 +2154,12 @@ html[lang="en"] .amp-redesign .amp-hero-title {
   .amp-redesign .amp-organization-trigger {
     gap: 0;
     justify-content: center;
+    padding: 4px;
   }
 
   .amp-redesign .amp-organization-trigger .amp-app-brand-text,
   .amp-redesign .amp-organization-chevron {
     display: none;
-  }
-
-  .amp-redesign .amp-organization-symbol {
-    display: block;
   }
 
   .amp-redesign .amp-container {
@@ -2113,19 +2206,27 @@ html[lang="en"] .amp-redesign .amp-hero-title {
     padding: 0 18px 30px;
   }
 
-  .amp-redesign.amp-app-shell,
-  .amp-redesign.amp-app-shell-collapsed {
+  .amp-redesign.amp-app-shell {
+    grid-template-rows: 64px minmax(0, 1fr);
+  }
+
+  .amp-redesign .amp-app-body {
     grid-template-columns: 64px minmax(0, 1fr);
   }
 
   .amp-redesign .amp-app-sidebar {
     padding: 16px 10px;
+    width: 64px;
+  }
+
+  .amp-redesign.amp-app-shell-expanded .amp-app-sidebar {
+    width: min(260px, calc(100vw - 56px));
   }
 
   .amp-redesign .amp-app-topbar {
     gap: 8px;
     height: 64px;
-    padding: 0 12px;
+    padding: 0 12px 0 9px;
   }
 
   .amp-redesign .amp-app-topbar-action span {
@@ -2136,6 +2237,14 @@ html[lang="en"] .amp-redesign .amp-hero-title {
     min-width: 44px;
     padding: 0;
     justify-content: center;
+  }
+
+  .amp-redesign .amp-notification-menu {
+    max-width: calc(100vw - 24px);
+    position: fixed;
+    right: 12px;
+    top: 70px;
+    width: 360px;
   }
 }
 

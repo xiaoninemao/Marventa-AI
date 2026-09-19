@@ -9,9 +9,10 @@ import { useToast } from "@/contexts/toast_context";
 import { localizeErrorMessage } from "@/i18n/errors";
 import { organizationName, organizationRole } from "@/utils/organizations";
 import InlineIcon from "@/components/redesign/InlineIcon";
+import OrganizationAvatar from "@/components/layout/organization_avatar";
 
 export default function OrganizationsPage() {
-  const { user, loading, organizations, organizationsLoading, organizationsError, organizationBusy, reloadOrganizations, createOrganization, switchOrganization } = useAuth();
+  const { user, loading, organizations, organizationsLoading, organizationsError, organizationBusy, createOrganization, switchOrganization } = useAuth();
   const { t, locale } = useI18n();
   const { showError } = useToast();
   const router = useRouter();
@@ -94,14 +95,17 @@ export default function OrganizationsPage() {
             <article key={item.id} data-organization-id={item.id} className="amp-workspace-card p-5">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <Link href={`/organizations/${encodeURIComponent(item.id)}`}
-                  className="min-w-0 flex-1 rounded-lg outline-none transition hover:opacity-75 focus-visible:ring-2 focus-visible:ring-blue-500">
-                  <h3 className="break-words text-base font-semibold text-slate-950">{organizationName(item, t)}</h3>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{organizationRole(item.role, t)}</span>
-                    {current?.id === item.id && <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">{t("当前组织", "Current organization")}</span>}
-                    <span className="text-slate-500">{t("成员数：{count}", "Members: {count}", { count: item.member_count })}</span>
+                  className="flex min-w-0 flex-1 gap-4 rounded-lg outline-none transition hover:opacity-75 focus-visible:ring-2 focus-visible:ring-blue-500">
+                  <OrganizationAvatar organization={item} className="h-11 w-11 text-sm" />
+                  <div className="min-w-0">
+                    <h3 className="break-words text-base font-semibold text-slate-950">{organizationName(item, t)}</h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-600">{organizationRole(item.role, t)}</span>
+                      {current?.id === item.id && <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700">{t("当前组织", "Current organization")}</span>}
+                      <span className="text-slate-500">{t("成员数：{count}", "Members: {count}", { count: item.member_count })}</span>
+                    </div>
+                    <p className="mt-3 break-all text-xs text-slate-400">ID: {item.id}</p>
                   </div>
-                  <p className="mt-3 break-all text-xs text-slate-400">ID: {item.id}</p>
                 </Link>
                 <div className="flex flex-wrap gap-2">
                   {current?.id !== item.id && <button type="button" className="amp-button amp-button-secondary" disabled={organizationBusy}

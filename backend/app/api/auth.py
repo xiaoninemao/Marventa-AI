@@ -1,10 +1,4 @@
-import base64
-import binascii
-import hashlib
 import logging
-import os
-import re
-import tempfile
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 
@@ -20,61 +14,12 @@ from app.auth.storage import (
     update_user,
 )
 from app.auth.dependencies import get_current_user
-from app.config import DEBUG, MEDIA_ROOT
+from app.config import DEBUG
+from app.media_storage import store_image_data_url
 from app.shared.response import success_response
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
-_AVATAR_DATA_URL = re.compile(
-    r"^data:(image/(?:png|jpeg|gif|webp));base64,([A-Za-z0-9+/=\\s]+)$"
-)
-_AVATAR_EXTENSIONS = {
-    "image/png": "png",
-    "image/jpeg": "jpg",
-    "image/gif": "gif",
-    "image/webp": "webp",
-}
-
-
-def _valid_image_signature(mime_type: str, data: bytes) -> bool:
-    if mime_type == "image/png":
-        return data.startswith(b"\x89PNG\r\n\x1a\n")
-    if mime_type == "image/jpeg":
-        return data.startswith(b"\xff\xd8\xff")
-    if mime_type == "image/gif":
-        return data.startswith((b"GIF87a", b"GIF89a"))
-    return len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP"
-
-
-def _store_avatar(value: str, user_id: str, base_url: str) -> str:
-    match = _AVATAR_DATA_URL.fullmatch(value)
-    if not match:
-        return value
-    mime_type, encoded = match.groups()
-    try:
-        data = base64.b64decode(encoded, validate=True)
-    except (binascii.Error, ValueError) as exc:
-        raise HTTPException(status_code=400, detail="Invalid profile image") from exc
-    if not data or len(data) > 2 * 1024 * 1024 or not _valid_image_signature(mime_type, data):
-        raise HTTPException(status_code=400, detail="Invalid profile image")
-    directory = os.path.join(MEDIA_ROOT, "avatars", user_id)
-    os.makedirs(directory, mode=0o700, exist_ok=True)
-    os.chmod(directory, 0o700)
-    filename = f"{hashlib.sha256(data).hexdigest()[:24]}.{_AVATAR_EXTENSIONS[mime_type]}"
-    destination = os.path.join(directory, filename)
-    if not os.path.exists(destination):
-        fd, temp_path = tempfile.mkstemp(prefix=".avatar-", dir=directory)
-        try:
-            with os.fdopen(fd, "wb") as handle:
-                handle.write(data)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.chmod(temp_path, 0o600)
-            os.replace(temp_path, destination)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-    return f"{base_url.rstrip('/')}/media/avatars/{user_id}/{filename}"
 
 
 def _user_to_response(row) -> UserResponse:
@@ -171,8 +116,9 @@ async def update_me(body: UserUpdate, request: Request, user=Depends(get_current
     if body.nickname is not None:
         updates["nickname"] = body.nickname.strip()
     if body.avatar_url is not None:
-        updates["avatar_url"] = _store_avatar(
-            body.avatar_url.strip(), user["id"], str(request.base_url),
+        updates["avatar_url"] = store_image_data_url(
+            body.avatar_url.strip(), "avatars", user["id"], str(request.base_url),
+            "Invalid profile image",
         )
 
     updated = update_user(user["id"], **updates)

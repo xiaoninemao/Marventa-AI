@@ -8,6 +8,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from app.config import DB_PATH
 from app.database import connect_database
+from app.notifications.storage import create_notification
 
 os_imported = __import__("os")
 logger = logging.getLogger(__name__)
@@ -65,6 +66,8 @@ def init_users_db() -> None:
         organization_cols = [r[1] for r in conn.execute("PRAGMA table_info(organizations)").fetchall()]
         if "name_is_custom" not in organization_cols:
             conn.execute("ALTER TABLE organizations ADD COLUMN name_is_custom INTEGER NOT NULL DEFAULT 0")
+        if "avatar_url" not in organization_cols:
+            conn.execute("ALTER TABLE organizations ADD COLUMN avatar_url TEXT NOT NULL DEFAULT ''")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS organization_memberships (
                 organization_id TEXT NOT NULL REFERENCES organizations(id),
@@ -171,7 +174,7 @@ def get_default_organization(user_id: str) -> sqlite3.Row | None:
     init_users_db()
     with closing(_get_conn()) as conn:
         return conn.execute("""
-            SELECT o.id, o.name, m.role,
+            SELECT o.id, o.name, o.avatar_url, m.role,
                    COALESCE(o.default_for_user_id IS NOT NULL AND o.name_is_custom = 0, 0) AS uses_default_name
             FROM organizations o
             JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?
@@ -181,7 +184,7 @@ def get_default_organization(user_id: str) -> sqlite3.Row | None:
 
 def _organization_details(conn: sqlite3.Connection, user_id: str, organization_id: str) -> sqlite3.Row | None:
     return conn.execute("""
-        SELECT o.id, o.name, o.created_at, m.role,
+        SELECT o.id, o.name, o.avatar_url, o.created_at, m.role,
                COALESCE(o.default_for_user_id = ?, 0) AS is_default,
                COALESCE(o.default_for_user_id IS NOT NULL AND o.name_is_custom = 0, 0) AS uses_default_name,
                (SELECT COUNT(*) FROM organization_memberships members WHERE members.organization_id = o.id) AS member_count
@@ -204,7 +207,7 @@ def list_organizations(user_id: str) -> list[sqlite3.Row]:
     init_users_db()
     with closing(_get_conn()) as conn:
         return conn.execute("""
-            SELECT o.id, o.name, o.created_at, m.role,
+            SELECT o.id, o.name, o.avatar_url, o.created_at, m.role,
                    COALESCE(o.default_for_user_id = ?, 0) AS is_default,
                    COALESCE(o.default_for_user_id IS NOT NULL AND o.name_is_custom = 0, 0) AS uses_default_name,
                    (SELECT COUNT(*) FROM organization_memberships members WHERE members.organization_id = o.id) AS member_count
@@ -294,6 +297,27 @@ def rename_organization(user_id: str, organization_id: str, name: str) -> sqlite
         return result
 
 
+def update_organization_avatar(
+    user_id: str, organization_id: str, avatar_url: str,
+) -> sqlite3.Row:
+    init_users_db()
+    with closing(_get_conn()) as conn, conn:
+        conn.execute("BEGIN IMMEDIATE")
+        organization = _organization_details(conn, user_id, organization_id)
+        if organization is None:
+            raise OrganizationNotFound("Organization not found")
+        if organization["role"] != "owner":
+            raise OrganizationPermissionDenied("Only organization owners can update the organization avatar")
+        conn.execute(
+            "UPDATE organizations SET avatar_url = ? WHERE id = ?",
+            (avatar_url, organization_id),
+        )
+        result = _organization_details(conn, user_id, organization_id)
+        if result is None:
+            raise RuntimeError("Updated organization could not be retrieved")
+        return result
+
+
 def _organization_owner_access(
     conn: sqlite3.Connection, user_id: str, organization_id: str,
 ) -> sqlite3.Row:
@@ -315,7 +339,7 @@ def invite_organization_member(
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     with closing(_get_conn()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
-        _organization_owner_access(conn, user_id, organization_id)
+        organization = _organization_owner_access(conn, user_id, organization_id)
         invited_user = conn.execute(
             "SELECT id FROM users WHERE lower(email) = ?",
             (email,),
@@ -331,6 +355,21 @@ def invite_organization_member(
         conn.execute(
             "INSERT INTO organization_memberships VALUES (?, ?, ?, ?)",
             (organization_id, invited_user["id"], role, now),
+        )
+        actor = conn.execute(
+            "SELECT username, nickname FROM users WHERE id = ?", (user_id,),
+        ).fetchone()
+        create_notification(
+            invited_user["id"],
+            "organization_invitation",
+            {
+                "organization_name": organization["name"],
+                "role": role,
+                "actor_name": actor["nickname"] or actor["username"],
+            },
+            action_url=f"/organizations/{organization_id}",
+            organization_id=organization_id,
+            conn=conn,
         )
         return conn.execute("""
             SELECT u.id AS user_id, u.username, u.nickname, m.role, m.created_at AS joined_at
@@ -348,7 +387,7 @@ def update_organization_member_role(
     init_users_db()
     with closing(_get_conn()) as conn, conn:
         conn.execute("BEGIN IMMEDIATE")
-        _organization_owner_access(conn, user_id, organization_id)
+        organization = _organization_owner_access(conn, user_id, organization_id)
         member = conn.execute("""
             SELECT m.role, o.owner_id
             FROM organization_memberships m
@@ -363,6 +402,15 @@ def update_organization_member_role(
             "UPDATE organization_memberships SET role = ? WHERE organization_id = ? AND user_id = ?",
             (role, organization_id, member_user_id),
         )
+        if member["role"] != role:
+            create_notification(
+                member_user_id,
+                "organization_role_changed",
+                {"organization_name": organization["name"], "role": role},
+                action_url=f"/organizations/{organization_id}",
+                organization_id=organization_id,
+                conn=conn,
+            )
         return conn.execute("""
             SELECT u.id AS user_id, u.username, u.nickname, m.role, m.created_at AS joined_at
             FROM organization_memberships m

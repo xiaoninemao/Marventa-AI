@@ -22,6 +22,7 @@
 
 | Release | Improvements |
 | --- | --- |
+| **v0.1.2** | Adds persistent collaboration notifications, organization avatars, and a redesigned workspace shell with a global top bar and hover-expand navigation. |
 | **v0.1.1** | Adds organization-wide collaboration, role-based permissions, hardened tenant storage, encrypted platform state, and storage operations. |
 | **v0.1.0** | First public release of the self-hosted, organization-aware AI marketing workspace. |
 
@@ -161,9 +162,9 @@ Create your account from the sign-in screen using a valid email address and a pa
 
 Authentication uses email addresses and local passwords; third-party sign-in is not supported. Existing installations retain server-side compatibility for legacy username sign-in.
 
-Each user owns a separate default organization named from their email prefix—for example, `alex@example.com` receives **alex's Organization** in English and **alex的组织** in Chinese. Existing users receive one automatically, with the legacy username used when no email is stored, and new users receive one during registration. Use the selector at the top of the sidebar to switch between organizations you belong to; the selection is saved to your account and restored after signing in again. **Organizations**, above **Settings**, lets you create organizations and open an organization detail page. Organization owners can rename the organization, add registered users by email, and assign administrator or member access. Custom organization names are displayed as entered.
+Each user owns a separate default organization named from their email prefix—for example, `alex@example.com` receives **alex's Organization** in English and **alex的组织** in Chinese. Existing users receive one automatically, with the legacy username used when no email is stored, and new users receive one during registration. Use the organization selector in the workspace header to switch between organizations you belong to; the selection is saved to your account and restored after signing in again. **Organizations**, above **Settings**, lets you create organizations and open an organization detail page. Organization owners can rename the organization, add registered users by email, and assign administrator or member access. Custom organization names are displayed as entered.
 
-Organization switching currently changes your selected organization only. It does not move or share existing business data, and existing access rules remain unchanged. Invitations add an existing registered account immediately; pending email invitations, organization-wide data sharing, and organization deletion are not yet available.
+Organization switching currently changes your selected organization only. It does not move or share existing business data, and existing access rules remain unchanged. Invitations add an existing registered account immediately; organization invitations and role changes appear in the persistent notification center, with unread counts and per-item or bulk read controls. Pending email invitations, organization-wide data sharing, and organization deletion are not yet available.
 
 Choose **English** or **简体中文** using the language selector in the public homepage header or the sign-in/sign-up panel. After signing in, the same preference is available under **Settings → Interface language**. The website and workspace default to Simplified Chinese and share your selection, which takes effect immediately and is saved in the current browser. User-entered content, saved work, and AI-generated results retain their original language. The README language switch is independent.
 

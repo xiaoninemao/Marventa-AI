@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
 from app.auth.models import (
@@ -8,6 +8,7 @@ from app.auth.models import (
     OrganizationMemberInvite,
     OrganizationMemberRole,
     OrganizationName,
+    OrganizationUpdate,
     OrganizationResponse,
 )
 from app.auth.storage import (
@@ -22,8 +23,10 @@ from app.auth.storage import (
     list_organizations,
     rename_organization,
     switch_organization,
+    update_organization_avatar,
     update_organization_member_role,
 )
+from app.media_storage import store_image_data_url
 from app.shared.response import success_response
 
 router = APIRouter(prefix="/api/v1/organizations", tags=["organizations"])
@@ -61,9 +64,32 @@ async def create_new_organization(body: OrganizationName, user=Depends(get_curre
 
 
 @router.patch("/{organization_id}")
-async def update_organization(organization_id: str, body: OrganizationName, user=Depends(get_current_user)):
+async def update_organization(
+    organization_id: str,
+    body: OrganizationUpdate,
+    request: Request,
+    user=Depends(get_current_user),
+):
     try:
-        organization = rename_organization(user["id"], organization_id, body.name)
+        if body.name is None and body.avatar_url is None:
+            raise ValueError("At least one organization field is required")
+        organization = (
+            rename_organization(user["id"], organization_id, body.name)
+            if body.name is not None
+            else get_organization(user["id"], organization_id)
+        )
+        if body.avatar_url is not None:
+            if organization["role"] != "owner":
+                raise OrganizationPermissionDenied(
+                    "Only organization owners can update the organization avatar",
+                )
+            avatar_url = store_image_data_url(
+                body.avatar_url.strip(), "organization-avatars", organization_id,
+                str(request.base_url), "Invalid organization image",
+            )
+            organization = update_organization_avatar(
+                user["id"], organization_id, avatar_url,
+            )
     except OrganizationNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except OrganizationPermissionDenied as exc:

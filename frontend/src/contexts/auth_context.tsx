@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import type { User, OrganizationDetails } from "@/types/auth";
-import { login_user, register_user, verify_token, update_me, set_auth_token, clear_auth_token, fetch_organizations, create_organization, rename_organization, switch_organization } from "@/services/api_client";
+import { login_user, register_user, verify_token, update_me, set_auth_token, clear_auth_token, fetch_organizations, create_organization, rename_organization, update_organization_avatar, switch_organization } from "@/services/api_client";
 import { apiError } from "@/i18n/errors";
 
 interface AuthContextType {
@@ -19,6 +19,7 @@ interface AuthContextType {
   reloadOrganizations: () => void;
   createOrganization: (name: string) => Promise<void>;
   renameOrganization: (id: string, name: string) => Promise<void>;
+  updateOrganizationAvatar: (id: string, avatarUrl: string) => Promise<OrganizationDetails>;
   switchOrganization: (id: string) => Promise<void>;
 }
 
@@ -100,6 +101,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [userId, mutateOrganization]);
 
+  const updateOrganizationAvatar = useCallback(async (id: string, avatarUrl: string) => {
+    if (!userId) throw apiError("Unauthorized");
+    let updated: OrganizationDetails | null = null;
+    await mutateOrganization(async () => {
+      const res = await update_organization_avatar(id, avatarUrl);
+      if (!res.success || !res.data) throw apiError(res.message || "Could not update organization avatar");
+      updated = res.data;
+      if (userIdRef.current === userId) {
+        setOrganizations((items) => items.map((item) => item.id === id ? res.data : item));
+        set_user((current) => current?.id === userId ? {
+          ...current,
+          default_organization: current.default_organization?.id === id ? res.data : current.default_organization,
+          current_organization: current.current_organization?.id === id ? res.data : current.current_organization,
+        } : current);
+      }
+    });
+    if (!updated) throw apiError("Could not update organization avatar");
+    return updated;
+  }, [userId, mutateOrganization]);
+
   const switchOrganization = useCallback(async (id: string) => {
     if (!userId) throw apiError("Unauthorized");
     await mutateOrganization(async () => {
@@ -176,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, organizations, organizationsLoading, organizationsError, organizationBusy, reloadOrganizations, createOrganization, renameOrganization, switchOrganization }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, organizations, organizationsLoading, organizationsError, organizationBusy, reloadOrganizations, createOrganization, renameOrganization, updateOrganizationAvatar, switchOrganization }}>
       {children}
     </AuthContext.Provider>
   );

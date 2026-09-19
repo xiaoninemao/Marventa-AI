@@ -20,6 +20,7 @@ import type {
 import type {
   AccountMemory, ContentProject, ItemResponse, ListResponse, PublishMetric, PublishReview, PublishTask, ReviewConclusion, SocialAccount,
 } from "@/types/publishing";
+import type { NotificationListResponse, NotificationMutationResponse } from "@/types/notifications";
 
 // ── Auth token management ──
 
@@ -145,6 +146,16 @@ export async function rename_organization(id: string, name: string): Promise<Ite
   return res.json();
 }
 
+export async function update_organization_avatar(id: string, avatarUrl: string): Promise<ItemResponse<OrganizationDetails>> {
+  const res = await fetch(`${API_BASE}/api/v1/organizations/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...auth_headers() },
+    body: JSON.stringify({ avatar_url: avatarUrl }),
+  }).catch(normalize_network_error);
+  if (!res.ok) throw await response_error(res, "Could not update organization avatar");
+  return res.json();
+}
+
 export async function invite_organization_member(
   id: string, email: string, role: "admin" | "member",
 ): Promise<ItemResponse<OrganizationMember>> {
@@ -177,6 +188,34 @@ export async function switch_organization(id: string): Promise<ItemResponse<Orga
     method: "POST", headers: auth_headers(),
   }).catch(normalize_network_error);
   if (!res.ok) throw await response_error(res, "Could not switch organization");
+  return res.json();
+}
+
+// ── Notifications API ──
+
+export async function fetch_notifications(limit = 30): Promise<NotificationListResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/notifications?limit=${limit}`, {
+    headers: auth_headers(),
+  }).catch(normalize_network_error);
+  if (!res.ok) throw await response_error(res, "Could not load notifications");
+  return res.json();
+}
+
+export async function mark_notification_read(id: string): Promise<NotificationMutationResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/notifications/${encodeURIComponent(id)}/read`, {
+    method: "PATCH",
+    headers: auth_headers(),
+  }).catch(normalize_network_error);
+  if (!res.ok) throw await response_error(res, "Could not update notification");
+  return res.json();
+}
+
+export async function mark_all_notifications_read(): Promise<NotificationMutationResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/notifications/read-all`, {
+    method: "POST",
+    headers: auth_headers(),
+  }).catch(normalize_network_error);
+  if (!res.ok) throw await response_error(res, "Could not update notifications");
   return res.json();
 }
 

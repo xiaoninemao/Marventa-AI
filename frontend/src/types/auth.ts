@@ -1,6 +1,7 @@
 export interface Organization {
   id: string;
   name: string;
+  avatar_url: string;
   role: "owner" | "admin" | "member";
   is_default: boolean;
   uses_default_name: boolean;

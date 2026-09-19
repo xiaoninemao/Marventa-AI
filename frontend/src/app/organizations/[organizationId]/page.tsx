@@ -15,6 +15,7 @@ import {
 import type { OrganizationDetail, OrganizationMember } from "@/types/auth";
 import { organizationName, organizationRole } from "@/utils/organizations";
 import InlineIcon from "@/components/redesign/InlineIcon";
+import OrganizationAvatar from "@/components/layout/organization_avatar";
 
 type EditableRole = "admin" | "member";
 
@@ -22,11 +23,12 @@ export default function OrganizationDetailPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
   const router = useRouter();
-  const { user, loading: authLoading, renameOrganization, reloadOrganizations } = useAuth();
+  const { user, loading: authLoading, renameOrganization, updateOrganizationAvatar, reloadOrganizations } = useAuth();
   const { t, locale } = useI18n();
   const { showError } = useToast();
   const renameDialogRef = useRef<HTMLDialogElement>(null);
   const inviteDialogRef = useRef<HTMLDialogElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [organization, setOrganization] = useState<OrganizationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +134,38 @@ export default function OrganizationDetailPage() {
     }
   };
 
+  const selectAvatar = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/gif", "image/webp"].includes(file.type)) {
+      showError(t("请选择 PNG、JPEG、GIF 或 WebP 图片", "Choose a PNG, JPEG, GIF, or WebP image."));
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showError(t("组织头像不能超过 2 MB", "The organization image must be 2 MB or smaller."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => showError(t("组织头像读取失败", "Could not read the organization image."));
+    reader.onload = async () => {
+      if (typeof reader.result !== "string") return;
+      setActionBusy(true);
+      setFormError(null);
+      setSuccess(null);
+      try {
+        const updated = await updateOrganizationAvatar(organizationId, reader.result);
+        setOrganization((current) => current ? { ...current, ...updated } : current);
+        setSuccess(t("组织头像已更新。", "Organization image updated."));
+      } catch (avatarError) {
+        setFormError(avatarError instanceof Error ? avatarError.message : "Could not update organization avatar");
+      } finally {
+        setActionBusy(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   if (authLoading || (loading && !organization)) {
     return <div className="p-8 text-sm text-slate-500" role="status">{t("加载中...", "Loading...")}</div>;
   }
@@ -157,7 +191,29 @@ export default function OrganizationDetailPage() {
       </Link>
 
       <div className="amp-workspace-header">
-        <div>
+        <div className="flex min-w-0 items-center gap-4">
+          <button
+            type="button"
+            className={`group relative shrink-0 rounded-xl ${canManage ? "cursor-pointer" : "cursor-default"}`}
+            disabled={!canManage || actionBusy}
+            aria-label={canManage ? t("上传组织头像", "Upload organization image") : undefined}
+            onClick={() => avatarInputRef.current?.click()}
+          >
+            <OrganizationAvatar organization={organization} className="h-14 w-14 text-lg" />
+            {canManage && (
+              <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-slate-950/0 text-white opacity-0 transition group-hover:bg-slate-950/45 group-hover:opacity-100 group-focus-visible:bg-slate-950/45 group-focus-visible:opacity-100">
+                <InlineIcon name="upload" className="h-5 w-5" />
+              </span>
+            )}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            className="hidden"
+            onChange={selectAvatar}
+          />
+          <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="amp-workspace-title break-words">{organizationName(organization, t)}</h1>
             {canManage && (
@@ -173,6 +229,7 @@ export default function OrganizationDetailPage() {
                 <InlineIcon name="edit" className="h-4 w-4" />
               </button>
             )}
+          </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -206,8 +263,7 @@ export default function OrganizationDetailPage() {
                 <p className="mt-1 truncate text-xs text-slate-500">@{member.username}</p>
               </div>
               {canManage && member.role !== "owner" ? (
-                <div className="flex items-center gap-3 text-sm text-slate-600">
-                  <span>{t("权限", "Permission")}</span>
+                <div className="flex items-center text-sm text-slate-600">
                   <div role="radiogroup"
                     aria-label={t("设置 {name} 的权限", "Set permissions for {name}", { name: member.nickname || member.username })}
                     className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">

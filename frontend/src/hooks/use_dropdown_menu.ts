@@ -2,7 +2,7 @@
 
 import { useCallback, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
-export function useDropdownMenu(itemCount: number) {
+export function useDropdownMenu(itemCount: number, align: "start" | "end" = "end") {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -22,7 +22,10 @@ export function useDropdownMenu(itemCount: number) {
       const width = menuRef.current?.offsetWidth ?? 180;
       const height = menuRef.current?.offsetHeight ?? 104;
       setPosition({
-        left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+        left: Math.max(8, Math.min(
+          align === "start" ? rect.left : rect.right - width,
+          window.innerWidth - width - 8,
+        )),
         top: window.innerHeight - rect.bottom >= height + 8
           ? rect.bottom + 8
           : Math.max(8, rect.top - height - 8),
@@ -44,7 +47,7 @@ export function useDropdownMenu(itemCount: number) {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open, itemCount, menuItems]);
+  }, [open, itemCount, menuItems, align]);
 
   const closeMenu = () => {
     setOpen(false);

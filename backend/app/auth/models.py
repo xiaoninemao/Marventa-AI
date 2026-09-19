@@ -18,6 +18,7 @@ class UserLogin(BaseModel):
 class OrganizationResponse(BaseModel):
     id: str
     name: str
+    avatar_url: str = ""
     role: Literal["owner", "admin", "member"]
     is_default: bool = True
     uses_default_name: bool = False
@@ -30,6 +31,11 @@ class OrganizationDetails(OrganizationResponse):
 
 class OrganizationName(BaseModel):
     name: str
+
+
+class OrganizationUpdate(BaseModel):
+    name: str | None = None
+    avatar_url: str | None = None
 
 
 class OrganizationMember(BaseModel):

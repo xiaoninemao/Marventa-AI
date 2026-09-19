@@ -15,6 +15,7 @@ export type InlineIconName =
   | "folder"
   | "gallery"
   | "home"
+  | "insight"
   | "lock"
   | "mail"
   | "menu"
@@ -54,6 +55,7 @@ const paths: Record<InlineIconName, ReactNode> = {
   folder: <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v7A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5v-9Z" />,
   gallery: <><path d="M4 5h7v6H4V5ZM13 5h7v6h-7V5ZM4 13h7v6H4v-6ZM13 13h7v6h-7v-6Z" /><path d="m6 9 1.2-1.3L9.5 10M15 9l1.2-1.3L18.5 10" /></>,
   home: <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9Z" />,
+  insight: <><path d="M8.6 15.5A7 7 0 1 1 15.4 15.5c-.9.7-1.4 1.5-1.4 2.5h-4c0-1-.5-1.8-1.4-2.5Z" /><path d="M9 18h6M10 22h4" /></>,
   lock: <path d="M7 10V8a5 5 0 0 1 10 0v2m-11 0h12v10H6V10Zm6 4v3" />,
   mail: <><path d="M3 5h18v14H3V5Z" /><path d="m4 7 8 6 8-6" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
