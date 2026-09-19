@@ -22,6 +22,7 @@
 
 | Release | Improvements |
 | --- | --- |
+| **v0.1.1** | Adds organization-wide collaboration, role-based permissions, hardened tenant storage, encrypted platform state, and storage operations. |
 | **v0.1.0** | First public release of the self-hosted, organization-aware AI marketing workspace. |
 
 ## What is Marventa AI?
