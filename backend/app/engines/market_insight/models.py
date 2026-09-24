@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class CodeBlock(BaseModel):
+    language: str = ""
+    code: str
+
+
+class Section(BaseModel):
+    heading: str
+    level: int
+    content: str
+    subsections: list["Section"] = []
+
+
+class AIAnalysis(BaseModel):
+    product_name: str = ""
+    product_category: str = ""
+    product_description: str = ""
+    product_images: list[str] = []
+    similar_products: list[str] = []
+    strengths: list[str] = []
+    weaknesses: list[str] = []
+    product_summary: str = ""
+    target_audience: str = ""
+    use_cases: list[str] = []
+    market_positioning: str = ""
+    tech_highlights: list[str] = []
+    suggested_marketing_angles: list[str] = []
+    marketing_stage: str = ""
+
+
+class ParsedDocument(BaseModel):
+    title: str
+    source_type: str
+    sections: list[Section] = []
+    code_blocks: list[CodeBlock] = []
+    tech_stack: list[str] = []
+    features: list[str] = []
+    raw_text: str = ""
+    ai_analysis: AIAnalysis | None = None
+    ai_model: str = ""
+
+
+class HistoryRecord(BaseModel):
+    id: str
+    filename: str
+    file_size: int
+    upload_time: str
+    source_type: str
+    title: str
+    ai_model: str = ""
+    ai_analysis: AIAnalysis | None = None
+    is_edited: bool = False
+    status: str = "completed"
+    owner_id: str = ""
+    creator_name: str = ""
+    organization_id: str = ""
+    project_id: str
+    project_title: str = ""
+    project_role: str = "member"
+
+
+class InsightSource(BaseModel):
+    id: str
+    insight_id: str
+    filename: str
+    file_size: int
+    source_type: str
+    upload_time: str
+    has_source_file: bool = False
+
+
+class HistoryUpdateRequest(BaseModel):
+    ai_analysis: AIAnalysis
+
+
+class InsightRenameRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+
+
+class ManualInsightRequest(BaseModel):
+    project_id: str
+    ai_analysis: AIAnalysis
+
+
+class ParseRequest(BaseModel):
+    repo_url: str = Field(..., description="GitHub or GitLab repository URL")
+    project_id: str
