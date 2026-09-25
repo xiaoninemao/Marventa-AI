@@ -36,6 +36,7 @@ MODIFY_CARD_AI_MODEL = _env("MODIFY_CARD_AI_MODEL", CASE_AI_MODEL) or CASE_AI_MO
 
 # ---- Database ----
 DB_PATH = os.getenv("DB_PATH", os.path.join(os.path.dirname(__file__), "..", "data", "market_insight.db"))
+DATABASE_URL = _env("DATABASE_URL")
 
 # ---- Auth ----
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production-use-a-random-string")
@@ -45,6 +46,20 @@ ENABLE_DEMO_USER = os.getenv("ENABLE_DEMO_USER", "false").lower() == "true"
 DEMO_USERNAME = _env("DEMO_USERNAME", "demo")
 DEMO_PASSWORD = _env("DEMO_PASSWORD")
 DEMO_EMAIL = _env("DEMO_EMAIL", "demo@local.dev")
+
+# ---- Channel Authorization ----
+# Each URL contains the provider-specific client and callback parameters.
+# The API appends a short-lived, signed state parameter before redirecting.
+CHANNEL_CREDENTIAL_ENCRYPTION_KEY = _env("CHANNEL_CREDENTIAL_ENCRYPTION_KEY")
+DOUYIN_CHANNEL_CLIENT_KEY = _env("DOUYIN_CHANNEL_CLIENT_KEY")
+DOUYIN_CHANNEL_CLIENT_SECRET = _env("DOUYIN_CHANNEL_CLIENT_SECRET")
+DOUYIN_CHANNEL_REDIRECT_URI = _env("DOUYIN_CHANNEL_REDIRECT_URI")
+XIAOHONGSHU_CHANNEL_APP_ID = _env("XIAOHONGSHU_CHANNEL_APP_ID")
+XIAOHONGSHU_CHANNEL_APP_SECRET = _env("XIAOHONGSHU_CHANNEL_APP_SECRET")
+XIAOHONGSHU_CHANNEL_CLIENT_NAME = _env(
+    "XIAOHONGSHU_CHANNEL_CLIENT_NAME", "Marventa AI",
+)
+FRONTEND_BASE_URL = _env("FRONTEND_BASE_URL", "http://127.0.0.1:3000")
 
 # ---- File Handling ----
 ALLOWED_DOCUMENT_TYPES = {
@@ -59,6 +74,18 @@ ALLOWED_EXTENSIONS = {".md", ".markdown", ".pdf", ".docx"}
 
 # ---- Media Storage ----
 MEDIA_ROOT = os.path.join(os.path.dirname(__file__), "..", "data", "media")
+MEDIA_STORAGE_BACKEND = _env("MEDIA_STORAGE_BACKEND", "local").lower()
+MEDIA_S3_BUCKET = _env("MEDIA_S3_BUCKET")
+MEDIA_S3_PREFIX = _env("MEDIA_S3_PREFIX")
+MEDIA_S3_REGION = _env("MEDIA_S3_REGION", "auto")
+MEDIA_S3_ENDPOINT_URL = _env("MEDIA_S3_ENDPOINT_URL")
+MEDIA_S3_ACCESS_KEY_ID = _env("MEDIA_S3_ACCESS_KEY_ID")
+MEDIA_S3_SECRET_ACCESS_KEY = _env("MEDIA_S3_SECRET_ACCESS_KEY")
+MEDIA_S3_ADDRESSING_STYLE = _env("MEDIA_S3_ADDRESSING_STYLE", "path")
+MEDIA_S3_PUBLIC_BASE_URL = _env("MEDIA_S3_PUBLIC_BASE_URL")
+MEDIA_S3_PRESIGNED_TTL_SECONDS = int(
+    _env("MEDIA_S3_PRESIGNED_TTL_SECONDS", "900"),
+)
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".m4v"}
 ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 MAX_VIDEO_SIZE_MB = int(os.getenv("MAX_VIDEO_SIZE_MB", "100"))

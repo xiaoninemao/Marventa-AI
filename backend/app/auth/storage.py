@@ -215,8 +215,10 @@ def get_default_organization(user_id: str) -> sqlite3.Row | None:
 def _organization_details(conn: sqlite3.Connection, user_id: str, organization_id: str) -> sqlite3.Row | None:
     return conn.execute("""
         SELECT o.id, o.name, o.avatar_url, o.created_at, m.role,
-               COALESCE(o.default_for_user_id = ?, 0) AS is_default,
-               COALESCE(o.default_for_user_id IS NOT NULL AND o.name_is_custom = 0, 0) AS uses_default_name,
+               CASE WHEN o.default_for_user_id = ? THEN 1 ELSE 0 END AS is_default,
+               CASE WHEN o.default_for_user_id IS NOT NULL
+                          AND o.name_is_custom = 0
+                    THEN 1 ELSE 0 END AS uses_default_name,
                (SELECT COUNT(*) FROM organization_memberships members WHERE members.organization_id = o.id) AS member_count
         FROM organizations o
         JOIN organization_memberships m ON m.organization_id = o.id AND m.user_id = ?

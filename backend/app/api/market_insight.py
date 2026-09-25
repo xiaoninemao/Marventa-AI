@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import shutil
 import uuid
 import aiofiles
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends, Request
-from fastapi.responses import FileResponse
 from app.engines.market_insight.models import (
     ParseRequest, HistoryUpdateRequest,
     InsightRenameRequest, ManualInsightRequest, ParsedDocument,
@@ -20,8 +18,15 @@ from app.engines.market_insight.storage import (
     InsightProjectAccessDenied, InsightRetryNotAllowed,
 )
 from app.shared.response import success_response
-from app.config import ALLOWED_EXTENSIONS, ALLOWED_DOCUMENT_TYPES, MAX_UPLOAD_SIZE_BYTES, MEDIA_ROOT
+from app.config import ALLOWED_EXTENSIONS, ALLOWED_DOCUMENT_TYPES, MAX_UPLOAD_SIZE_BYTES
 from app.auth.dependencies import get_current_user
+from app.media_storage import (
+    delete_media,
+    delete_media_prefix,
+    guess_content_type,
+    media_response,
+    put_media_bytes,
+)
 
 router = APIRouter(prefix="/api/v1/market_insight", tags=["market_insight"])
 
@@ -86,11 +91,7 @@ async def get_history_source_file(
     if source_file is None:
         raise HTTPException(status_code=404, detail="Source file not found")
     filename, relative_path = source_file
-    media_root = os.path.realpath(MEDIA_ROOT)
-    file_path = os.path.realpath(os.path.join(MEDIA_ROOT, relative_path))
-    if os.path.commonpath([file_path, media_root]) != media_root or not os.path.isfile(file_path):
-        raise HTTPException(status_code=404, detail="Source file not found")
-    return FileResponse(file_path, filename=filename)
+    return media_response(relative_path, filename=filename)
 
 
 @router.put("/history/{record_id}")
@@ -165,14 +166,9 @@ async def delete_history_item(record_id: str, current_user=Depends(get_current_u
     if not deleted:
         raise HTTPException(status_code=404, detail="Record not found")
 
-    media_root = os.path.realpath(MEDIA_ROOT)
-    source_root = os.path.realpath(os.path.join(MEDIA_ROOT, "market_insight_sources", record_id))
-    if os.path.commonpath([source_root, media_root]) == media_root and os.path.isdir(source_root):
-        shutil.rmtree(source_root)
+    delete_media_prefix(f"market_insight_sources/{record_id}")
     for _, relative_path in source_files:
-        source_dir = os.path.realpath(os.path.join(MEDIA_ROOT, relative_path, os.pardir))
-        if os.path.commonpath([source_dir, media_root]) == media_root and os.path.isdir(source_dir):
-            shutil.rmtree(source_dir)
+        delete_media(relative_path)
 
     return success_response("Record deleted")
 
@@ -270,17 +266,18 @@ async def parse_file(
             sum(len(content) for _, content, _ in parsed_sources),
             owner_id=current_user["id"], project_id=project_id, status=status,
         )
-        persisted_dir = os.path.join(MEDIA_ROOT, "market_insight_sources", record.id)
-        os.makedirs(persisted_dir, exist_ok=True)
+        persisted_dir = f"market_insight_sources/{record.id}"
         for position, (file, content_bytes, parsed) in enumerate(parsed_sources):
             safe_filename = os.path.basename(file.filename or f"source-{position + 1}")
             stored_filename = f"{position + 1}-{safe_filename}"
-            relative_path = os.path.join(
-                "market_insight_sources", record.id, stored_filename,
+            relative_path = (
+                f"market_insight_sources/{record.id}/{stored_filename}"
             )
-            persisted_path = os.path.join(MEDIA_ROOT, relative_path)
-            async with aiofiles.open(persisted_path, "wb") as persisted:
-                await persisted.write(content_bytes)
+            put_media_bytes(
+                relative_path,
+                content_bytes,
+                content_type=file.content_type or guess_content_type(stored_filename),
+            )
             add_insight_source(
                 record.id,
                 file.filename or safe_filename,
@@ -302,16 +299,16 @@ async def parse_file(
     except ValueError as e:
         if record is not None:
             delete_insight(record.id, current_user["id"])
-        if persisted_dir and os.path.isdir(persisted_dir):
-            shutil.rmtree(persisted_dir)
+        if persisted_dir:
+            delete_media_prefix(persisted_dir)
         raise HTTPException(status_code=422, detail=str(e))
     except HTTPException:
         raise
     except Exception as exc:
         if record is not None:
             delete_insight(record.id, current_user["id"])
-        if persisted_dir and os.path.isdir(persisted_dir):
-            shutil.rmtree(persisted_dir)
+        if persisted_dir:
+            delete_media_prefix(persisted_dir)
         raise HTTPException(status_code=500, detail="Could not persist source file") from exc
     finally:
         for temp_path in temp_paths:

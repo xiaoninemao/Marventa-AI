@@ -6,6 +6,7 @@ import sqlite3
 import time
 from contextlib import closing
 
+from app.database import is_postgresql
 from app.engines.content_generator import storage
 
 
@@ -27,6 +28,8 @@ def ensure_presence_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_creation_presence_expiry
         ON creation_presence_leases(expires_at)
     """)
+    if is_postgresql(conn):
+        return
     # Older deletion paths may use connections without foreign-key enforcement.
     for table, column in (
         ("creation_sessions", "session_id"),

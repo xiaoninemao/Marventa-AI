@@ -19,7 +19,6 @@ import { organizationName } from "@/utils/organizations";
 import InlineIcon from "@/components/redesign/InlineIcon";
 import OrganizationAvatar from "@/components/layout/organization_avatar";
 import EnterpriseSelect from "@/components/redesign/EnterpriseSelect";
-import DeleteConfirmDialog from "@/components/redesign/DeleteConfirmDialog";
 import { userAvatarColor as memberAvatarColor, userAvatarInitial } from "@/utils/user_avatar";
 
 type EditableRole = "admin" | "member";
@@ -34,7 +33,7 @@ export default function OrganizationDetailPage() {
   const params = useParams<{ organizationId: string }>();
   const organizationId = params.organizationId;
   const router = useRouter();
-  const { user, loading: authLoading, deleteOrganization, renameOrganization, updateOrganizationAvatar, reloadOrganizations } = useAuth();
+  const { user, loading: authLoading, renameOrganization, updateOrganizationAvatar, reloadOrganizations } = useAuth();
   const { t, locale } = useI18n();
   const { showError, showSuccess } = useToast();
   const renameDialogRef = useRef<HTMLDialogElement>(null);
@@ -50,7 +49,8 @@ export default function OrganizationDetailPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<EditableRole>("member");
   const [memberToRemove, setMemberToRemove] = useState<OrganizationMember | null>(null);
-  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [memberMenuUserId, setMemberMenuUserId] = useState<string | null>(null);
+  const memberMenuRef = useRef<HTMLDivElement>(null);
 
   const loadOrganization = useCallback(async () => {
     setLoading(true);
@@ -79,6 +79,17 @@ export default function OrganizationDetailPage() {
     const message = formError || error;
     if (message) showError(localizeErrorMessage(message, locale));
   }, [formError, error, locale, showError]);
+
+  useEffect(() => {
+    if (!memberMenuUserId) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !memberMenuRef.current?.contains(event.target)) {
+        setMemberMenuUserId(null);
+      }
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, [memberMenuUserId]);
 
   const saveName = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -160,21 +171,6 @@ export default function OrganizationDetailPage() {
       showSuccess(t("成员已移出组织。", "The member was removed from the organization."));
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Could not remove organization member");
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const removeOrganization = async () => {
-    if (!organization) return;
-    setActionBusy(true);
-    setError(null);
-    try {
-      await deleteOrganization(organization.id);
-      showSuccess(t("组织已删除", "Organization deleted"));
-      router.replace("/organizations");
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Could not delete organization");
     } finally {
       setActionBusy(false);
     }
@@ -298,17 +294,6 @@ export default function OrganizationDetailPage() {
               {t("邀请成员", "Invite member")}
             </button>
           )}
-          {canEditOrganization && !organization.is_default && (
-            <button
-              type="button"
-              className="amp-button amp-project-delete-confirm"
-              disabled={actionBusy}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <InlineIcon name="trash" className="h-4 w-4" />
-              {t("删除", "Delete")}
-            </button>
-          )}
         </div>
       </div>
 
@@ -362,15 +347,38 @@ export default function OrganizationDetailPage() {
                 </div>
                 <div className="sm:justify-self-end">
                   {canEditMember && (
-                    <button type="button" disabled={actionBusy}
-                      className="inline-flex min-h-7 items-center gap-1.5 px-0.5 text-sm font-medium text-red-600 hover:text-red-700"
-                      onClick={() => {
-                        setMemberToRemove(member);
-                        removeDialogRef.current?.showModal();
-                      }}>
-                      <InlineIcon name="trash" className="h-4 w-4" />
-                      {t("移出", "Remove")}
-                    </button>
+                    <div ref={memberMenuUserId === member.user_id ? memberMenuRef : undefined}
+                      className="relative inline-flex">
+                      <button type="button" disabled={actionBusy}
+                        className="amp-member-action-more"
+                        aria-haspopup="menu"
+                        aria-expanded={memberMenuUserId === member.user_id}
+                        aria-label={t("{name} 的成员操作", "Member actions for {name}", { name: displayName })}
+                        onClick={() => setMemberMenuUserId((current) =>
+                          current === member.user_id ? null : member.user_id)}>
+                        <InlineIcon name="more" className="h-5 w-5" strokeWidth={3} />
+                      </button>
+                      {memberMenuUserId === member.user_id && (
+                        <div role="menu" className="amp-member-action-menu"
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setMemberMenuUserId(null);
+                            }
+                          }}>
+                          <button type="button" role="menuitem"
+                            className="amp-member-action-danger" disabled={actionBusy}
+                            onClick={() => {
+                              setMemberMenuUserId(null);
+                              setMemberToRemove(member);
+                              removeDialogRef.current?.showModal();
+                            }}>
+                            <InlineIcon name="trash" />
+                            {t("移出成员", "Remove member")}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -459,21 +467,6 @@ export default function OrganizationDetailPage() {
         </div>
       </dialog>
 
-      <DeleteConfirmDialog
-        open={deleteOpen}
-        title={t("删除组织", "Delete organization")}
-        message={t(
-          "删除后，该组织内的项目、洞察、案例、作品和成员关系都将永久删除，且无法恢复。确认删除“{name}”吗？",
-          "All projects, insights, cases, portfolio work, and memberships in this organization will be permanently deleted. Delete “{name}”?",
-          { name: organizationName(organization, t) },
-        )}
-        cancelLabel={t("取消", "Cancel")}
-        confirmLabel={t("删除组织", "Delete organization")}
-        busyLabel={t("删除中...", "Deleting...")}
-        busy={actionBusy}
-        onCancel={() => setDeleteOpen(false)}
-        onConfirm={() => void removeOrganization()}
-      />
     </div>
   );
 }

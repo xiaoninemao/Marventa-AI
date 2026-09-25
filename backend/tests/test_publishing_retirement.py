@@ -27,7 +27,6 @@ class PublishingRetirementTests(unittest.TestCase):
         self.enterContext(patch.object(auth_storage, "DB_PATH", self.db_path))
         self.enterContext(patch.object(content_storage, "DB_PATH", self.db_path))
         self.enterContext(patch.object(storage, "DB_PATH", self.db_path))
-        self.enterContext(patch.object(publishing, "MEDIA_ROOT", directory))
         self.user = auth_storage.create_user("owner", "owner@example.com", "test-hash")
         self.headers = {"Authorization": "Bearer " + create_access_token(self.user["id"])}
         self.project = storage.create_manual_project(self.user["id"], title="Existing project")
@@ -105,6 +104,11 @@ class PublishingRetirementTests(unittest.TestCase):
             "/projects/{project_id}": {"get", "patch", "delete"},
             "/projects/{project_id}/members": {"get", "post"},
             "/projects/{project_id}/members/{member_user_id}": {"patch", "delete"},
+            "/projects/{project_id}/channel-accounts": {"get"},
+            "/projects/{project_id}/channel-accounts/authorization": {"post"},
+            "/projects/{project_id}/channel-accounts/authorization/xiaohongshu/poll": {"post"},
+            "/projects/{project_id}/channel-accounts/{account_id}": {"delete"},
+            "/channel-accounts/oauth/douyin/callback": {"get"},
         }
         for path, methods in expected_project_methods.items():
             self.assertEqual(set(paths["/api/v1/publishing" + path]), methods)
@@ -124,6 +128,10 @@ class PublishingRetirementTests(unittest.TestCase):
             self.assertFalse(set(models[name]["properties"]) & {
                 "account_memory_id", "account_memory_ids", "account_name", "publish_task_id",
             })
+        self.assertNotIn(
+            "marketing_channels",
+            models["UpdateProjectRequest"]["properties"],
+        )
 
     def test_legacy_project_storage_exports_remain_compatible(self):
         for name in (

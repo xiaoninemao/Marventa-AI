@@ -166,6 +166,7 @@ def analyze_async(
     tags: list[str],
     image_paths: list[str] | None = None,
     video_url: str = "",
+    cleanup_paths: list[str] | None = None,
 ) -> None:
     """Run AI analysis in a background thread and update the DB on completion."""
 
@@ -179,6 +180,12 @@ def analyze_async(
             update_case_ai(case_id, "completed", analysis)
         except Exception:
             update_case_ai(case_id, "failed")
+        finally:
+            for path in cleanup_paths or []:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
 
     t = threading.Thread(target=_run, daemon=True)
     t.start()

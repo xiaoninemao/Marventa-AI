@@ -1,6 +1,3 @@
-import os
-import shutil
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.auth.dependencies import get_current_user
@@ -31,7 +28,12 @@ from app.auth.storage import (
     update_organization_avatar,
     update_organization_member_role,
 )
-from app.media_storage import MEDIA_ROOT, store_image_data_url
+from app.media_storage import (
+    delete_media,
+    delete_media_prefix,
+    media_key_from_url,
+    store_image_data_url,
+)
 from app.shared.response import success_response
 
 router = APIRouter(prefix="/api/v1/organizations", tags=["organizations"])
@@ -113,20 +115,15 @@ async def remove_organization(organization_id: str, user=Depends(get_current_use
     except OrganizationPermissionDenied as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
 
-    media_root = os.path.realpath(MEDIA_ROOT)
-    for directory in (
-        os.path.join(MEDIA_ROOT, "organization-avatars", organization_id),
-        os.path.join(MEDIA_ROOT, "publishing", organization_id),
-        os.path.join(MEDIA_ROOT, "market_insight_sources", organization_id),
+    for prefix in (
+        f"organization-avatars/{organization_id}",
+        f"publishing/{organization_id}",
+        f"market_insight_sources/{organization_id}",
     ):
-        resolved = os.path.realpath(directory)
-        if os.path.commonpath([resolved, media_root]) == media_root and os.path.isdir(resolved):
-            shutil.rmtree(resolved)
+        delete_media_prefix(prefix)
     for path in media_paths:
-        relative_path = path.split("/media/", 1)[-1] if "/media/" in path else path.lstrip("/")
-        candidate = os.path.realpath(os.path.join(MEDIA_ROOT, relative_path))
-        if os.path.commonpath([candidate, media_root]) == media_root and os.path.isfile(candidate):
-            os.remove(candidate)
+        if key := media_key_from_url(path):
+            delete_media(key)
     return success_response("Organization deleted")
 
 

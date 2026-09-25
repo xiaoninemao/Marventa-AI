@@ -2,8 +2,10 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+from urllib.parse import parse_qs, urlparse
 
+from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -14,9 +16,12 @@ from app.api.content_generator import router as content_generator_router
 from app.api.publishing import router as publishing_router
 from app.api import publishing as publishing_api
 from app.api import market_insight as market_insight_api
-from app.api import case_library as case_library_api
 from app.auth import storage as auth_storage
-from app.auth.security import create_access_token
+from app.auth.security import create_access_token, decode_access_token
+from app import media_storage
+from app.engines.publishing import channel_credentials
+from app.engines.publishing import channel_oauth
+from app.engines.publishing import project_channel_accounts
 from app.engines.publishing import storage as publishing_storage
 from app.engines.market_insight import storage as market_insight_storage
 from app.engines.market_insight.models import AIAnalysis, ParsedDocument
@@ -43,9 +48,7 @@ class ProjectMembershipTests(unittest.TestCase):
         self.enterContext(patch.object(case_import_tasks, "DB_PATH", self.db_path))
         self.enterContext(patch.object(content_storage, "DB_PATH", self.db_path))
         self.enterContext(patch.object(portfolio_storage, "DB_PATH", self.db_path))
-        self.enterContext(patch.object(publishing_api, "MEDIA_ROOT", str(self.media_root)))
-        self.enterContext(patch.object(market_insight_api, "MEDIA_ROOT", str(self.media_root)))
-        self.enterContext(patch.object(case_library_api, "MEDIA_ROOT", str(self.media_root)))
+        self.enterContext(patch.object(media_storage, "MEDIA_ROOT", str(self.media_root)))
         self.enterContext(patch.object(market_insight_storage, "MEDIA_ROOT", str(self.media_root)))
         self.owner = auth_storage.create_user("owner", "owner@example.com", "test-hash")
         self.admin = auth_storage.create_user("admin", "admin@example.com", "test-hash")
@@ -1672,6 +1675,292 @@ class ProjectMembershipTests(unittest.TestCase):
             200,
         )
         self.assertIsNone(publishing_storage.get_project(self.project.id, self.owner["id"]))
+
+    def test_project_channel_accounts_are_project_scoped_and_manager_controlled(self):
+        base = f"/api/v1/publishing/projects/{self.project.id}"
+        accounts_path = base + "/channel-accounts"
+        account_id = "authorized-xhs"
+        douyin_account_id = "authorized-douyin"
+        with sqlite3.connect(self.db_path) as conn:
+            conn.executemany(
+                """
+                INSERT INTO project_channel_accounts (
+                    id, project_id, platform, account_name, platform_user_id,
+                    profile_url, notes, created_by_user_id, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        account_id, self.project.id, "xiaohongshu", "Brand Notes",
+                        "xhs-100", "https://example.com/xhs", "", self.owner["id"],
+                        "2026-01-01", "2026-01-01",
+                    ),
+                    (
+                        douyin_account_id, self.project.id, "douyin", "Launch Video",
+                        "douyin-200", "https://example.com/douyin", "", self.member["id"],
+                        "2026-01-02", "2026-01-02",
+                    ),
+                ],
+            )
+
+        members_path = base + "/members"
+        self.assertEqual(self.client.post(
+            members_path,
+            headers=self.headers(self.owner["id"]),
+            json={"email": "member@example.com", "role": "member"},
+        ).status_code, 200)
+        member_headers = self.headers(self.member["id"])
+        listed = self.client.get(accounts_path, headers=member_headers)
+        self.assertEqual(listed.status_code, 200)
+        listed_accounts = listed.json()["data"]
+        self.assertEqual(
+            [item["id"] for item in listed_accounts],
+            [account_id, douyin_account_id],
+        )
+        self.assertEqual(listed_accounts[0]["creator_name"], "owner")
+        self.assertEqual(listed_accounts[1]["creator_name"], "member")
+        for listed_account in listed_accounts:
+            self.assertNotIn("credential_blob", listed_account)
+            self.assertNotIn("access_token", listed_account)
+            self.assertNotIn("refresh_token", listed_account)
+        authorization_path = accounts_path + "/authorization"
+        self.assertEqual(self.client.post(
+            authorization_path,
+            headers=self.headers(self.owner["id"]),
+            json={"platform": "xiaohongshu"},
+        ).status_code, 503)
+        with (
+            patch.multiple(
+                channel_oauth,
+                DOUYIN_CHANNEL_CLIENT_KEY="douyin-key",
+                DOUYIN_CHANNEL_CLIENT_SECRET="douyin-secret",
+                DOUYIN_CHANNEL_REDIRECT_URI="https://app.example/oauth/douyin",
+            ),
+            patch.object(
+                channel_oauth,
+                "ensure_channel_credential_encryption",
+            ),
+        ):
+            authorization = self.client.post(
+                authorization_path,
+                headers=self.headers(self.owner["id"]),
+                json={"platform": "douyin"},
+            )
+            member_authorization = self.client.post(
+                authorization_path,
+                headers=member_headers,
+                json={"platform": "douyin"},
+            )
+        self.assertEqual(authorization.status_code, 200, authorization.text)
+        self.assertEqual(member_authorization.status_code, 200, member_authorization.text)
+        authorization_url = authorization.json()["data"]["authorization_url"]
+        self.assertTrue(authorization_url.startswith(
+            "https://open.douyin.com/platform/oauth/connect?",
+        ))
+        authorization_state = parse_qs(urlparse(authorization_url).query)["state"][0]
+        state_claims = decode_access_token(authorization_state)
+        self.assertEqual(state_claims["project_id"], self.project.id)
+        self.assertEqual(state_claims["platform"], "douyin")
+        self.assertEqual(state_claims["sub"], self.owner["id"])
+        self.assertEqual(self.client.post(
+            authorization_path,
+            headers=self.headers(self.outsider["id"]),
+            json={"platform": "xiaohongshu"},
+        ).status_code, 404)
+
+        account_path = accounts_path + "/" + account_id
+        other_project = self.client.post(
+            "/api/v1/publishing/projects/manual",
+            headers=self.headers(self.owner["id"]),
+            json={"title": "Other account scope"},
+        ).json()["data"]
+        other_accounts_path = (
+            f"/api/v1/publishing/projects/{other_project['id']}/channel-accounts"
+        )
+        self.assertEqual(
+            self.client.get(
+                other_accounts_path, headers=self.headers(self.owner["id"]),
+            ).json()["data"],
+            [],
+        )
+        self.assertEqual(
+            self.client.delete(
+                other_accounts_path + "/" + account_id,
+                headers=self.headers(self.owner["id"]),
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.delete(account_path, headers=member_headers).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.delete(
+                account_path, headers=self.headers(self.owner["id"]),
+            ).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(accounts_path, headers=member_headers).json()["data"],
+            [listed_accounts[1]],
+        )
+        self.assertEqual(self.client.delete(
+            accounts_path + "/" + douyin_account_id,
+            headers=member_headers,
+        ).status_code, 200)
+
+    def test_channel_authorization_state_and_credentials_are_secure(self):
+        state = project_channel_accounts.create_channel_authorization_state(
+            self.owner["id"], self.project.id, "douyin",
+        )
+        self.assertEqual(
+            project_channel_accounts.consume_channel_authorization_state(
+                state, "douyin",
+            ),
+            (self.owner["id"], self.project.id),
+        )
+        with self.assertRaises(
+            project_channel_accounts.InvalidChannelAuthorizationState,
+        ):
+            project_channel_accounts.consume_channel_authorization_state(
+                state, "douyin",
+            )
+
+        encryption_key = Fernet.generate_key().decode("ascii")
+        credentials = {
+            "access_token": "access-secret",
+            "refresh_token": "refresh-secret",
+        }
+        with patch.object(
+            channel_credentials,
+            "CHANNEL_CREDENTIAL_ENCRYPTION_KEY",
+            encryption_key,
+        ):
+            saved = project_channel_accounts.save_authorized_channel_account(
+                self.owner["id"],
+                self.project.id,
+                platform="douyin",
+                platform_user_id="open-id-100",
+                account_name="Authorized creator",
+                profile_url="https://example.com/profile",
+                scopes=["user_info", "video.create"],
+                credentials=credentials,
+                token_expires_at="2026-10-10 00:00:00",
+                refresh_token_expires_at="2026-11-10 00:00:00",
+            )
+            with sqlite3.connect(self.db_path) as conn:
+                credential_blob = conn.execute(
+                    "SELECT credential_blob FROM project_channel_accounts WHERE id = ?",
+                    (saved.id,),
+                ).fetchone()[0]
+            self.assertNotIn("access-secret", credential_blob)
+            self.assertEqual(
+                channel_credentials.decrypt_channel_credentials(credential_blob),
+                credentials,
+            )
+        self.assertEqual(saved.authorization_status, "active")
+        self.assertEqual(saved.platform_user_id, "open-id-100")
+
+    def test_channel_oauth_callbacks_bind_accounts_to_the_originating_project(self):
+        encryption_key = Fernet.generate_key().decode("ascii")
+        douyin_state = project_channel_accounts.create_channel_authorization_state(
+            self.owner["id"], self.project.id, "douyin",
+        )
+        douyin_grant = channel_oauth.ChannelOAuthGrant(
+            platform_user_id="douyin-open-id",
+            account_name="Douyin callback creator",
+            avatar_url="https://example.com/douyin.jpg",
+            profile_url="",
+            scopes=["user_info"],
+            credentials={
+                "access_token": "douyin-access",
+                "refresh_token": "douyin-refresh",
+                "open_id": "douyin-open-id",
+            },
+            token_expires_at="2026-10-10 00:00:00",
+            refresh_token_expires_at="2026-11-10 00:00:00",
+        )
+        with (
+            patch.object(
+                publishing_api,
+                "exchange_douyin_code",
+                AsyncMock(return_value=douyin_grant),
+            ),
+            patch.object(
+                channel_credentials,
+                "CHANNEL_CREDENTIAL_ENCRYPTION_KEY",
+                encryption_key,
+            ),
+        ):
+            callback = self.client.get(
+                "/api/v1/publishing/channel-accounts/oauth/douyin/callback",
+                params={"code": "provider-code", "state": douyin_state},
+                follow_redirects=False,
+            )
+        self.assertEqual(callback.status_code, 303, callback.text)
+        self.assertIn(
+            f"/projects/{self.project.id}?tab=channels&channel_authorization=success",
+            callback.headers["location"],
+        )
+
+        xhs_state = project_channel_accounts.create_channel_authorization_state(
+            self.owner["id"], self.project.id, "xiaohongshu",
+        )
+        project_channel_accounts.attach_device_authorization(
+            xhs_state,
+            "xiaohongshu",
+            provider_code="xhs-device-code",
+            poll_interval_seconds=2,
+        )
+        xhs_grant = channel_oauth.ChannelOAuthGrant(
+            platform_user_id="xhs-open-id",
+            account_name="Xiaohongshu callback creator",
+            avatar_url="https://example.com/xhs.jpg",
+            profile_url="",
+            scopes=["basic_info"],
+            credentials={
+                "access_token": "xhs-access",
+                "refresh_token": "xhs-refresh",
+                "open_id": "xhs-open-id",
+            },
+            token_expires_at="2026-10-10 00:00:00",
+            refresh_token_expires_at="2027-03-10 00:00:00",
+        )
+        with (
+            patch.object(
+                publishing_api,
+                "poll_xiaohongshu_authorization",
+                AsyncMock(return_value=channel_oauth.DeviceAuthorizationPoll(
+                    status="authorized",
+                    interval=2,
+                    grant=xhs_grant,
+                )),
+            ),
+            patch.object(
+                channel_credentials,
+                "CHANNEL_CREDENTIAL_ENCRYPTION_KEY",
+                encryption_key,
+            ),
+        ):
+            polled = self.client.post(
+                f"/api/v1/publishing/projects/{self.project.id}"
+                "/channel-accounts/authorization/xiaohongshu/poll",
+                headers=self.headers(self.owner["id"]),
+                json={"state": xhs_state},
+            )
+        self.assertEqual(polled.status_code, 200, polled.text)
+        self.assertEqual(polled.json()["data"]["status"], "authorized")
+        listed = self.client.get(
+            f"/api/v1/publishing/projects/{self.project.id}/channel-accounts",
+            headers=self.headers(self.owner["id"]),
+        ).json()["data"]
+        self.assertEqual(
+            {(item["platform"], item["platform_user_id"]) for item in listed},
+            {
+                ("douyin", "douyin-open-id"),
+                ("xiaohongshu", "xhs-open-id"),
+            },
+        )
 
     def test_project_member_cannot_customize_delete_or_invite(self):
         project_path = f"/api/v1/publishing/projects/{self.project.id}"

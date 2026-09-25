@@ -1,0 +1,49 @@
+name: Backend databases
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - working-directory: backend
+        run: python -m unittest discover -s tests
+
+  postgresql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: marventa
+          POSTGRES_PASSWORD: marventa
+          POSTGRES_DB: marventa_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marventa -d marventa_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      - working-directory: backend
+        env:
+          TEST_POSTGRES_URL: postgresql://marventa:marventa@127.0.0.1:5432/marventa_test
+        run: python -m unittest tests.test_postgresql_integration

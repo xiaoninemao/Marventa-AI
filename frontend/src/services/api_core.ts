@@ -1,6 +1,7 @@
-import { apiError } from "@/i18n/errors";
+import { apiError } from "../i18n/errors.ts";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://127.0.0.1:8765";
+export const AUTH_EXPIRED_EVENT = "marventa:auth-expired";
 
 let authToken: string | null = null;
 
@@ -10,6 +11,13 @@ export function set_auth_token(token: string | null) {
 
 export function clear_auth_token() {
   authToken = null;
+}
+
+function expire_auth_session() {
+  clear_auth_token();
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem("auth_token");
+  window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
 export function auth_headers(): Record<string, string> {
@@ -27,6 +35,7 @@ export function normalize_network_error(error: unknown): never {
 }
 
 export async function response_error(res: Response, fallback: string): Promise<Error> {
+  if (res.status === 401) expire_auth_session();
   try {
     const err = await res.clone().json();
     return apiError(err.detail || err.message || fallback);

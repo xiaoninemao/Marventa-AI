@@ -19,7 +19,7 @@ from app.engines.publishing.models import (
     ReviewConclusion,
     SocialAccount,
 )
-from app.engines.publishing import project_memberships, projects
+from app.engines.publishing import project_channel_accounts, project_memberships, projects
 # Keep the original storage-module imports available to existing project clients.
 from app.engines.publishing.project_memberships import (
     ProjectNotFound as ProjectNotFound,
@@ -106,6 +106,96 @@ def init_db() -> None:
             PRIMARY KEY (project_id, user_id)
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_channel_accounts (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES content_projects(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL CHECK (platform IN ('xiaohongshu', 'douyin')),
+            account_name TEXT NOT NULL,
+            platform_user_id TEXT NOT NULL DEFAULT '',
+            profile_url TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            created_by_user_id TEXT NOT NULL DEFAULT '',
+            authorization_status TEXT NOT NULL DEFAULT 'active',
+            scopes TEXT NOT NULL DEFAULT '[]',
+            credential_blob TEXT NOT NULL DEFAULT '',
+            token_expires_at TEXT NOT NULL DEFAULT '',
+            refresh_token_expires_at TEXT NOT NULL DEFAULT '',
+            last_refreshed_at TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (project_id, platform, account_name)
+        )
+    """)
+    channel_account_cols = [
+        row[1] for row in conn.execute(
+            "PRAGMA table_info(project_channel_accounts)",
+        ).fetchall()
+    ]
+    if "created_by_user_id" not in channel_account_cols:
+        conn.execute(
+            "ALTER TABLE project_channel_accounts "
+            "ADD COLUMN created_by_user_id TEXT NOT NULL DEFAULT ''",
+        )
+    for column, ddl in {
+        "authorization_status": "TEXT NOT NULL DEFAULT 'active'",
+        "scopes": "TEXT NOT NULL DEFAULT '[]'",
+        "credential_blob": "TEXT NOT NULL DEFAULT ''",
+        "token_expires_at": "TEXT NOT NULL DEFAULT ''",
+        "refresh_token_expires_at": "TEXT NOT NULL DEFAULT ''",
+        "last_refreshed_at": "TEXT NOT NULL DEFAULT ''",
+    }.items():
+        if column not in channel_account_cols:
+            conn.execute(
+                f"ALTER TABLE project_channel_accounts ADD COLUMN {column} {ddl}",
+            )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_channel_authorization_states (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL REFERENCES content_projects(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL CHECK (platform IN ('xiaohongshu', 'douyin')),
+            user_id TEXT NOT NULL,
+            provider_code TEXT NOT NULL DEFAULT '',
+            poll_interval_seconds INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            consumed_at TEXT NOT NULL DEFAULT ''
+        )
+    """)
+    authorization_state_cols = [
+        row[1] for row in conn.execute(
+            "PRAGMA table_info(project_channel_authorization_states)",
+        ).fetchall()
+    ]
+    for column, ddl in {
+        "provider_code": "TEXT NOT NULL DEFAULT ''",
+        "poll_interval_seconds": "INTEGER NOT NULL DEFAULT 1",
+    }.items():
+        if column not in authorization_state_cols:
+            conn.execute(
+                "ALTER TABLE project_channel_authorization_states "
+                f"ADD COLUMN {column} {ddl}",
+            )
+    conn.execute("""
+        UPDATE project_channel_accounts
+        SET created_by_user_id = COALESCE((
+            SELECT membership.user_id
+            FROM project_memberships membership
+            WHERE membership.project_id = project_channel_accounts.project_id
+              AND membership.role = 'owner'
+            ORDER BY membership.created_at, membership.user_id
+            LIMIT 1
+        ), '')
+        WHERE created_by_user_id = ''
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_channel_accounts_project "
+        "ON project_channel_accounts(project_id, platform, created_at)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_project_channel_authorization_states_expiry "
+        "ON project_channel_authorization_states(expires_at, consumed_at)"
+    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_project_memberships_user "
         "ON project_memberships(user_id, project_id)"
@@ -118,9 +208,9 @@ def init_db() -> None:
     conn.execute("""
         UPDATE project_memberships
         SET role = 'owner'
-        WHERE rowid IN (
-            SELECT (
-                SELECT candidate.rowid
+        WHERE (project_id, user_id) IN (
+            SELECT project.id, (
+                SELECT candidate.user_id
                 FROM project_memberships candidate
                 WHERE candidate.project_id = project.id
                 ORDER BY candidate.created_at, candidate.user_id
@@ -136,7 +226,7 @@ def init_db() -> None:
     """)
     conn.execute("""
         WITH ranked_owners AS (
-            SELECT rowid,
+            SELECT project_id, user_id,
                    ROW_NUMBER() OVER (
                        PARTITION BY project_id
                        ORDER BY created_at, user_id
@@ -146,8 +236,10 @@ def init_db() -> None:
         )
         UPDATE project_memberships
         SET role = 'admin'
-        WHERE rowid IN (
-            SELECT rowid FROM ranked_owners WHERE owner_number > 1
+        WHERE (project_id, user_id) IN (
+            SELECT project_id, user_id
+            FROM ranked_owners
+            WHERE owner_number > 1
         )
     """)
     conn.execute("""
@@ -998,3 +1090,4 @@ def _row_to_review(row: sqlite3.Row) -> PublishReview:
 
 project_memberships.configure(_get_conn, init_db, _now)
 projects.configure(_get_conn, init_db, _now)
+project_channel_accounts.configure(_get_conn, init_db, _now)

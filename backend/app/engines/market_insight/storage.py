@@ -5,7 +5,7 @@ import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
-from app.config import DB_PATH, MEDIA_ROOT
+from app.config import DB_PATH, MEDIA_ROOT, MEDIA_S3_BUCKET, MEDIA_STORAGE_BACKEND
 from app.database import connect_database
 from app.engines.market_insight.models import (
     AIAnalysis,
@@ -19,6 +19,7 @@ from app.storage_schema import (
     ensure_project_scope,
     resolve_user_organization_id,
 )
+from app.media_storage import delete_media, list_media_keys, media_exists
 
 _reconciled_storage_roots: set[tuple[str, str]] = set()
 
@@ -160,7 +161,11 @@ def init_db() -> None:
         "ON insights(project_id, upload_time DESC)"
     )
     ensure_project_scope(conn, "insights")
-    reconciliation_key = (os.path.realpath(DB_PATH), os.path.realpath(MEDIA_ROOT))
+    reconciliation_key = (
+        os.path.realpath(DB_PATH),
+        MEDIA_STORAGE_BACKEND,
+        MEDIA_S3_BUCKET or os.path.realpath(MEDIA_ROOT),
+    )
     if reconciliation_key not in _reconciled_storage_roots:
         _reconcile_source_files(conn)
         _reconciled_storage_roots.add(reconciliation_key)
@@ -169,34 +174,23 @@ def init_db() -> None:
 
 
 def _reconcile_source_files(conn: sqlite3.Connection) -> None:
-    media_root = os.path.realpath(MEDIA_ROOT)
-    source_root = os.path.realpath(os.path.join(MEDIA_ROOT, "market_insight_sources"))
     expected_files: set[str] = set()
     rows = conn.execute(
         "SELECT id, source_file_path FROM insight_sources WHERE source_file_path != ''",
     ).fetchall()
     for row in rows:
-        file_path = os.path.realpath(os.path.join(MEDIA_ROOT, row["source_file_path"]))
-        if (
-            os.path.commonpath([file_path, media_root]) != media_root
-            or not os.path.isfile(file_path)
-        ):
+        key = str(row["source_file_path"]).replace("\\", "/")
+        if not media_exists(key):
             conn.execute(
                 "UPDATE insight_sources SET source_file_path = '' WHERE id = ?",
                 (row["id"],),
             )
             continue
-        expected_files.add(file_path)
+        expected_files.add(key)
 
-    if not os.path.isdir(source_root):
-        return
-    for directory, _, filenames in os.walk(source_root, topdown=False):
-        for filename in filenames:
-            file_path = os.path.realpath(os.path.join(directory, filename))
-            if file_path not in expected_files:
-                os.remove(file_path)
-        if directory != source_root and not os.listdir(directory):
-            os.rmdir(directory)
+    for key in list_media_keys("market_insight_sources"):
+        if key not in expected_files:
+            delete_media(key)
 
 
 def _project_access(

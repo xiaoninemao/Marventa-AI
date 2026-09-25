@@ -22,6 +22,10 @@ An open-source workspace for research, insight, content creation, and reusable m
 
 ---
 
+| Release | Summary |
+| --- | --- |
+| v1.1.0 | Channel integrations, S3-compatible object storage, PostgreSQL production database support, and collaboration and interface improvements. |
+
 ## Product
 
 Marketing work rarely begins with a lack of ideas. It begins with scattered context:
@@ -69,6 +73,7 @@ Continue the conversation, edit individual cards, restore earlier versions, and 
 
 - Explicit project membership and roles
 - Project-bound insights, cases, creations, media, and portfolio work
+- Platform-authorized Xiaohongshu and Douyin account connections at project level
 - Creator attribution and project-aware permissions
 - Searchable project navigation across the core workflow
 
@@ -216,6 +221,116 @@ Windows:
 ```powershell
 .\scripts\stop-local.ps1
 ```
+
+## Channel authorization
+
+Project integrations use each platform's official account-authorization flow:
+
+- Douyin uses Web OAuth with a server callback.
+- Xiaohongshu web applications use the official device flow with a QR code and backend polling.
+- Tokens are encrypted at rest with a dedicated Fernet key and are never returned to the browser.
+
+```env
+DOUYIN_CHANNEL_CLIENT_KEY=
+DOUYIN_CHANNEL_CLIENT_SECRET=
+DOUYIN_CHANNEL_REDIRECT_URI=https://api.example.com/api/v1/publishing/channel-accounts/oauth/douyin/callback
+
+XIAOHONGSHU_CHANNEL_APP_ID=
+XIAOHONGSHU_CHANNEL_APP_SECRET=
+XIAOHONGSHU_CHANNEL_CLIENT_NAME=Marventa AI
+
+FRONTEND_BASE_URL=https://app.example.com
+CHANNEL_CREDENTIAL_ENCRYPTION_KEY=
+```
+
+Generate `CHANNEL_CREDENTIAL_ENCRYPTION_KEY` with:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+The current public Xiaohongshu account platform exposes `basic_info` but not public
+note-publishing access. Douyin publishing requires a separately approved capability and
+must be authorized at publishing time. Connecting an account does not claim either
+publishing permission.
+
+## Object storage
+
+Local media remains the default for development. Production deployments can switch
+avatars, case images/videos, and market-insight source files to any S3-compatible
+service, including AWS S3, Cloudflare R2, and MinIO.
+
+```env
+MEDIA_STORAGE_BACKEND=s3
+MEDIA_S3_BUCKET=marventa-media
+MEDIA_S3_PREFIX=production
+MEDIA_S3_REGION=auto
+MEDIA_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
+MEDIA_S3_ACCESS_KEY_ID=
+MEDIA_S3_SECRET_ACCESS_KEY=
+MEDIA_S3_ADDRESSING_STYLE=path
+MEDIA_S3_PRESIGNED_TTL_SECONDS=900
+```
+
+- For AWS S3, set the AWS region and leave `MEDIA_S3_ENDPOINT_URL` empty.
+- For Cloudflare R2, use region `auto` and the account-specific S3 endpoint.
+- For MinIO, use its endpoint URL and the addressing style required by the deployment.
+- Keep the bucket private. Marventa redirects media requests to short-lived presigned
+  URLs. `MEDIA_S3_PUBLIC_BASE_URL` is optional for intentionally public buckets/CDNs.
+- Use a unique `MEDIA_S3_PREFIX` when multiple installations share one bucket.
+
+Existing local files can be copied without database changes because object keys preserve
+their current relative paths:
+
+```bash
+cd backend
+.venv/bin/python scripts/migrate_media_to_object_storage.py --dry-run
+.venv/bin/python scripts/migrate_media_to_object_storage.py
+```
+
+The migration uploads and verifies every object but retains local files. Remove local
+media only after the application has been validated against object storage.
+
+## Production database
+
+SQLite remains the zero-configuration default:
+
+```env
+DATABASE_URL=
+```
+
+Production and multi-instance deployments can use PostgreSQL 16+:
+
+```env
+DATABASE_URL=postgresql://marventa:password@database.example.com:5432/marventa
+```
+
+The same application storage modules support both backends. PostgreSQL uses native
+transactions, foreign keys, scoped triggers, identity columns, and conflict handling.
+The database URL is a deployment secret and must not be committed.
+
+To move an existing installation, create an empty PostgreSQL database, stop application
+writes, back up SQLite and media, then run:
+
+```bash
+cd backend
+.venv/bin/python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path data/market_insight.db \
+  --database-url 'postgresql://marventa:password@host:5432/marventa'
+```
+
+Preview the source table counts without connecting to PostgreSQL:
+
+```bash
+.venv/bin/python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path data/market_insight.db \
+  --database-url 'postgresql://unused' \
+  --dry-run
+```
+
+The destination must be empty. The migration initializes the PostgreSQL schema, copies
+tables in dependency order, and verifies every table's row count before reporting
+success. Keep the SQLite backup until the PostgreSQL deployment has been validated.
 
 ## AI configuration
 

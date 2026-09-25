@@ -32,6 +32,24 @@ export interface ProjectMember {
   joined_at: string;
 }
 
+export interface ProjectChannelAccount {
+  id: string;
+  project_id: string;
+  platform: "xiaohongshu" | "douyin";
+  account_name: string;
+  platform_user_id: string;
+  profile_url: string;
+  notes: string;
+  created_by_user_id: string;
+  creator_name: string;
+  creator_avatar_url: string;
+  authorization_status: string;
+  token_expires_at: string;
+  refresh_token_expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ListResponse<T> {
   success: boolean;
   message: string;

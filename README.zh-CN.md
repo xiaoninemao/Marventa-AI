@@ -22,6 +22,10 @@
 
 ---
 
+| 版本 | 更新摘要 |
+| --- | --- |
+| v1.1.0 | 渠道集成、S3 兼容对象存储、PostgreSQL 生产数据库支持，以及协作与界面优化。 |
+
 ## 产品价值
 
 营销工作通常不缺少想法，真正缺少的是完整而持续的上下文：
@@ -69,6 +73,7 @@ Marventa AI 将这些上下文收拢到以项目为中心的工作区中。
 
 - 明确的项目成员与角色
 - 洞察、案例、创作、媒体和作品全部绑定项目
+- 通过平台授权完成项目级小红书与抖音账号连接
 - 创建者信息与项目级权限
 - 核心流程均支持项目搜索与快速切换
 
@@ -216,6 +221,104 @@ Windows：
 ```powershell
 .\scripts\stop-local.ps1
 ```
+
+## 渠道账号授权
+
+项目集成使用平台官方账号授权流程：
+
+- 抖音使用网页 OAuth，并由后端处理回调。
+- 小红书网页应用使用官方设备授权流程，在前端显示二维码并由后端轮询状态。
+- Token 使用独立 Fernet 密钥加密保存，不会返回浏览器。
+
+```env
+DOUYIN_CHANNEL_CLIENT_KEY=
+DOUYIN_CHANNEL_CLIENT_SECRET=
+DOUYIN_CHANNEL_REDIRECT_URI=https://api.example.com/api/v1/publishing/channel-accounts/oauth/douyin/callback
+
+XIAOHONGSHU_CHANNEL_APP_ID=
+XIAOHONGSHU_CHANNEL_APP_SECRET=
+XIAOHONGSHU_CHANNEL_CLIENT_NAME=Marventa AI
+
+FRONTEND_BASE_URL=https://app.example.com
+CHANNEL_CREDENTIAL_ENCRYPTION_KEY=
+```
+
+生成 `CHANNEL_CREDENTIAL_ENCRYPTION_KEY`：
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+小红书账号开放平台当前公开开放 `basic_info`，尚未公开开放笔记发布能力。抖音发布能力需要单独申请，并应在实际发布时再次取得授权。连接账号本身不代表已经取得平台发布权限。
+
+## 对象存储
+
+开发环境默认继续使用本地媒体目录。生产部署可将头像、案例图片/视频和市场洞察源文件切换到任意 S3 兼容服务，包括 AWS S3、Cloudflare R2 和 MinIO。
+
+```env
+MEDIA_STORAGE_BACKEND=s3
+MEDIA_S3_BUCKET=marventa-media
+MEDIA_S3_PREFIX=production
+MEDIA_S3_REGION=auto
+MEDIA_S3_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
+MEDIA_S3_ACCESS_KEY_ID=
+MEDIA_S3_SECRET_ACCESS_KEY=
+MEDIA_S3_ADDRESSING_STYLE=path
+MEDIA_S3_PRESIGNED_TTL_SECONDS=900
+```
+
+- AWS S3：填写实际区域，并将 `MEDIA_S3_ENDPOINT_URL` 留空。
+- Cloudflare R2：区域使用 `auto`，Endpoint 使用账号对应的 S3 地址。
+- MinIO：填写部署 Endpoint 和对应的寻址模式。
+- 建议使用私有 Bucket。Marventa 会为媒体请求生成短期预签名地址。
+- 只有明确使用公共 Bucket/CDN 时才配置 `MEDIA_S3_PUBLIC_BASE_URL`。
+- 多个 Marventa 实例共用 Bucket 时，应设置不同的 `MEDIA_S3_PREFIX`。
+
+现有本地媒体可以保持原有相对路径迁移，不需要修改数据库：
+
+```bash
+cd backend
+.venv/bin/python scripts/migrate_media_to_object_storage.py --dry-run
+.venv/bin/python scripts/migrate_media_to_object_storage.py
+```
+
+迁移脚本会上传并验证每个对象，但不会删除本地文件。确认应用在对象存储模式下工作正常后，再自行清理本地媒体目录。
+
+## 生产数据库
+
+SQLite 仍是无需配置的默认数据库：
+
+```env
+DATABASE_URL=
+```
+
+生产环境和多实例部署可以使用 PostgreSQL 16+：
+
+```env
+DATABASE_URL=postgresql://marventa:password@database.example.com:5432/marventa
+```
+
+同一套业务存储模块支持两种后端。PostgreSQL 使用原生事务、外键、范围约束触发器、自增标识列和冲突处理。数据库 URL 属于部署密钥，不能提交到仓库。
+
+迁移已有安装时，先创建空 PostgreSQL 数据库、停止应用写入并备份 SQLite 和媒体，再运行：
+
+```bash
+cd backend
+.venv/bin/python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path data/market_insight.db \
+  --database-url 'postgresql://marventa:password@host:5432/marventa'
+```
+
+仅查看源数据库表和记录数，不连接 PostgreSQL：
+
+```bash
+.venv/bin/python scripts/migrate_sqlite_to_postgres.py \
+  --sqlite-path data/market_insight.db \
+  --database-url 'postgresql://unused' \
+  --dry-run
+```
+
+目标数据库必须为空。迁移脚本会初始化 PostgreSQL 表结构、按依赖顺序复制数据，并核对每张表的记录数。完成生产验证前应保留 SQLite 备份。
 
 ## AI 模型配置
 

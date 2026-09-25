@@ -7,11 +7,14 @@ import { useAuth } from "@/contexts/auth_context";
 import { useI18n } from "@/contexts/i18n_context";
 import { useToast } from "@/contexts/toast_context";
 import { localizeErrorMessage } from "@/i18n/errors";
+import type { OrganizationDetails } from "@/types/auth";
 import { organizationName, organizationRole } from "@/utils/organizations";
 import OrganizationAvatar from "@/components/layout/organization_avatar";
+import InlineIcon from "@/components/redesign/InlineIcon";
+import DeleteConfirmDialog from "@/components/redesign/DeleteConfirmDialog";
 
 export default function OrganizationsPage() {
-  const { user, loading, organizations, organizationsLoading, organizationsError, organizationBusy, createOrganization, switchOrganization } = useAuth();
+  const { user, loading, organizations, organizationsLoading, organizationsError, organizationBusy, createOrganization, deleteOrganization, switchOrganization } = useAuth();
   const { t, locale } = useI18n();
   const { showError, showSuccess } = useToast();
   const router = useRouter();
@@ -20,6 +23,9 @@ export default function OrganizationsPage() {
   const [name, setName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [organizationMenuId, setOrganizationMenuId] = useState<string | null>(null);
+  const [organizationToDelete, setOrganizationToDelete] = useState<OrganizationDetails | null>(null);
+  const organizationMenuRef = useRef<HTMLDivElement>(null);
   const current = user?.current_organization ?? user?.default_organization;
 
   useEffect(() => {
@@ -37,6 +43,20 @@ export default function OrganizationsPage() {
     const message = organizationsError || actionError || formError;
     if (message) showError(localizeErrorMessage(message, locale));
   }, [organizationsError, actionError, formError, locale, showError]);
+
+  useEffect(() => {
+    if (!organizationMenuId) return;
+    const close = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node
+        && !organizationMenuRef.current?.contains(event.target)
+      ) {
+        setOrganizationMenuId(null);
+      }
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [organizationMenuId]);
 
   const openEditor = () => {
     setName("");
@@ -67,6 +87,18 @@ export default function OrganizationsPage() {
       showSuccess(t("已切换当前组织，刷新后仍会保留选择。", "Current organization changed. Your selection will be retained after refreshing."));
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Could not switch organization");
+    }
+  };
+
+  const removeOrganization = async () => {
+    if (!organizationToDelete) return;
+    setActionError(null);
+    try {
+      await deleteOrganization(organizationToDelete.id);
+      setOrganizationToDelete(null);
+      showSuccess(t("组织已删除", "Organization deleted"));
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Could not delete organization");
     }
   };
 
@@ -102,13 +134,61 @@ export default function OrganizationsPage() {
                   </div>
                 </Link>
                 <div className="flex flex-wrap gap-2">
-                  {current?.id === item.id ? (
+                  {current?.id === item.id && (
                     <span className="inline-flex min-h-[38px] items-center rounded-lg bg-emerald-50 px-3 text-sm font-semibold text-emerald-700">
                       {t("当前组织", "Current organization")}
                     </span>
-                  ) : (
-                    <button type="button" className="amp-button amp-button-secondary" disabled={organizationBusy}
-                      onClick={() => void activate(item.id)}>{t("切换到此组织", "Switch to organization")}</button>
+                  )}
+                  {(current?.id !== item.id || (item.role === "owner" && !item.is_default)) && (
+                    <div ref={organizationMenuId === item.id ? organizationMenuRef : undefined}
+                      className="relative inline-flex">
+                      <button type="button" className="amp-member-action-more"
+                        disabled={organizationBusy}
+                        aria-haspopup="menu"
+                        aria-expanded={organizationMenuId === item.id}
+                        aria-label={t(
+                          "{name} 的组织操作",
+                          "Organization actions for {name}",
+                          { name: organizationName(item, t) },
+                        )}
+                        onClick={() => setOrganizationMenuId((value) =>
+                          value === item.id ? null : item.id)}>
+                        <InlineIcon name="more" className="h-5 w-5" strokeWidth={3} />
+                      </button>
+                      {organizationMenuId === item.id && (
+                        <div role="menu" className="amp-member-action-menu"
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setOrganizationMenuId(null);
+                            }
+                          }}>
+                          {current?.id !== item.id && (
+                            <button type="button" role="menuitem"
+                              disabled={organizationBusy}
+                              onClick={() => {
+                                setOrganizationMenuId(null);
+                                void activate(item.id);
+                              }}>
+                              <InlineIcon name="organization" />
+                              {t("切换到此组织", "Switch to organization")}
+                            </button>
+                          )}
+                          {item.role === "owner" && !item.is_default && (
+                            <button type="button" role="menuitem"
+                              className="amp-member-action-danger"
+                              disabled={organizationBusy}
+                              onClick={() => {
+                                setOrganizationMenuId(null);
+                                setOrganizationToDelete(item);
+                              }}>
+                              <InlineIcon name="trash" />
+                              {t("删除组织", "Delete organization")}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -134,6 +214,22 @@ export default function OrganizationsPage() {
           </div>
         </form>
       </dialog>
+
+      <DeleteConfirmDialog
+        open={Boolean(organizationToDelete)}
+        title={t("删除组织", "Delete organization")}
+        message={t(
+          "删除后，该组织内的项目、洞察、案例、作品和成员关系都将永久删除，且无法恢复。确认删除“{name}”吗？",
+          "All projects, insights, cases, portfolio work, and memberships in this organization will be permanently deleted. Delete “{name}”?",
+          { name: organizationToDelete ? organizationName(organizationToDelete, t) : "" },
+        )}
+        cancelLabel={t("取消", "Cancel")}
+        confirmLabel={t("删除组织", "Delete organization")}
+        busyLabel={t("删除中...", "Deleting...")}
+        busy={organizationBusy}
+        onCancel={() => setOrganizationToDelete(null)}
+        onConfirm={() => void removeOrganization()}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   switch_organization, update_organization_avatar,
 } from "@/services/organization_api";
 import { apiError } from "@/i18n/errors";
+import { AUTH_EXPIRED_EVENT } from "@/services/api_core";
 
 interface AuthContextType {
   user: User | null;
@@ -209,6 +210,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Don't call router.push here — each protected page's auth guard
     // handles redirect to / when user becomes null. Calling router.push
     // races with those guards (which use router.replace) and breaks navigation.
+  }, []);
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      userIdRef.current = null;
+      set_user(null);
+      setOrganizations([]);
+      setOrganizationsError(null);
+      setOrganizationsLoading(false);
+      setOrganizationBusy(false);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
   }, []);
 
   const updateUser = useCallback(async (updates: { nickname?: string; avatar_url?: string }) => {

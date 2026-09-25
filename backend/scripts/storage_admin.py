@@ -3,16 +3,17 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import subprocess
 import sys
 import tarfile
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import DB_PATH, MEDIA_ROOT
-from app.database import connect_database
+from app.config import DATABASE_URL, DB_PATH, MEDIA_ROOT, MEDIA_STORAGE_BACKEND
+from app.database import connect_database, is_postgresql
 
 
 USER_SCOPED_TABLES = {
@@ -34,8 +35,12 @@ USER_SCOPED_TABLES = {
 def check_storage() -> int:
     conn = connect_database(DB_PATH)
     try:
-        integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
-        foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if is_postgresql(conn):
+            integrity = "ok"
+            foreign_keys = []
+        else:
+            integrity = conn.execute("PRAGMA integrity_check").fetchone()[0]
+            foreign_keys = conn.execute("PRAGMA foreign_key_check").fetchall()
         orphan_counts: dict[str, int] = {}
         for table, user_column in USER_SCOPED_TABLES.items():
             exists = conn.execute(
@@ -64,18 +69,30 @@ def backup_storage(output: str) -> None:
     output_path = Path(output).expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temp_dir:
-        snapshot = Path(temp_dir) / "database.sqlite"
-        source = connect_database(DB_PATH)
-        target = sqlite3.connect(snapshot)
-        try:
-            source.backup(target)
-        finally:
-            target.close()
-            source.close()
+        if DATABASE_URL:
+            snapshot = Path(temp_dir) / "database.dump"
+            subprocess.run(
+                [
+                    "pg_dump",
+                    "--format=custom",
+                    f"--file={snapshot}",
+                    DATABASE_URL,
+                ],
+                check=True,
+            )
+        else:
+            snapshot = Path(temp_dir) / "database.sqlite"
+            source = connect_database(DB_PATH)
+            target = sqlite3.connect(snapshot)
+            try:
+                source.backup(target)
+            finally:
+                target.close()
+                source.close()
         with tarfile.open(output_path, "w:gz") as archive:
-            archive.add(snapshot, arcname="database.sqlite")
+            archive.add(snapshot, arcname=snapshot.name)
             media = Path(MEDIA_ROOT)
-            if media.exists():
+            if MEDIA_STORAGE_BACKEND == "local" and media.exists():
                 archive.add(media, arcname="media")
             states = Path(DB_PATH).resolve().parent / "platform_storage_states"
             if states.exists():
@@ -89,10 +106,13 @@ def prune_audit(days: int) -> None:
         raise ValueError("days must be at least 1")
     conn = connect_database(DB_PATH)
     try:
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=days)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
         cursor = conn.execute(
             "DELETE FROM data_audit_log "
-            "WHERE created_at < strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?)",
-            (f"-{days} days",),
+            "WHERE created_at < ?",
+            (cutoff,),
         )
         conn.commit()
         print(f"deleted={cursor.rowcount}")

@@ -4453,41 +4453,425 @@
   width: 100%;
 }
 
-.amp-redesign .amp-project-members-heading {
-  align-items: flex-start;
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
+.amp-redesign .amp-project-channels {
+  margin-top: 18px;
+  width: 100%;
 }
 
-.amp-redesign .amp-project-members-heading p {
+.amp-redesign .amp-project-integration-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.amp-redesign .amp-project-channel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.amp-redesign .amp-project-integration-list.has-toolbar {
+  margin-top: 12px;
+}
+
+.amp-redesign .amp-project-channel-filter-empty {
+  align-items: center;
+  color: #667085;
+  display: flex;
+  font-size: 13px;
+  justify-content: center;
+  min-height: 72px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.amp-redesign .amp-project-integration-row {
+  background: #ffffff;
+  border: 1px solid #e4e7ec;
+  border-radius: 9px;
+  overflow: visible;
+}
+
+.amp-redesign .amp-project-integration-main {
+  align-items: center;
+  color: #344054;
+  display: grid;
+  gap: 24px;
+  grid-template-areas: "app account creator created actions";
+  grid-template-columns: minmax(130px, 0.75fr) minmax(180px, 1.25fr) minmax(130px, 0.8fr) minmax(145px, auto) 36px;
+  min-height: 78px;
+  padding: 12px 16px;
+}
+
+.amp-redesign .amp-project-integration-app,
+.amp-redesign .amp-project-integration-creator {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+}
+
+.amp-redesign .amp-project-integration-app {
+  grid-area: app;
+}
+
+.amp-redesign .amp-project-integration-account {
+  grid-area: account;
+}
+
+.amp-redesign .amp-project-integration-creator {
+  grid-area: creator;
+}
+
+.amp-redesign .amp-project-integration-account {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.amp-redesign .amp-project-integration-app strong,
+.amp-redesign .amp-project-integration-account strong,
+.amp-redesign .amp-project-integration-creator strong {
+  color: #101828;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amp-redesign .amp-project-integration-account > span {
+  color: #667085;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.amp-redesign .amp-project-integration-icon {
+  border-radius: 8px;
+  display: inline-flex;
+  height: 42px;
+  overflow: hidden;
+  width: 42px;
+}
+
+.amp-redesign .amp-project-integration-icon img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.amp-redesign .amp-project-integration-avatar {
+  align-items: center;
+  border-radius: 50%;
+  color: #344054;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  width: 34px;
+}
+
+.amp-redesign .amp-project-integration-created {
+  color: #667085;
+  font-size: 12px;
+  grid-area: created;
+  white-space: nowrap;
+}
+
+.amp-redesign .amp-project-integration-actions {
+  align-items: center;
+  display: flex;
+  grid-area: actions;
+  justify-content: flex-end;
+  position: relative;
+  white-space: nowrap;
+}
+
+.amp-redesign .amp-channel-action-menu a,
+.amp-redesign .amp-channel-action-menu button {
+  align-items: center;
+  border-radius: 6px;
+  color: #344054;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.amp-redesign .amp-channel-action-menu a:hover {
+  background: #f2f4f7;
+}
+
+.amp-redesign .amp-channel-action-menu .amp-channel-revoke {
+  color: #d92d20;
+}
+
+.amp-redesign .amp-channel-action-menu .amp-channel-revoke:hover {
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.amp-redesign .amp-project-channel-picker {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.amp-redesign .amp-project-channel-picker + .amp-project-channel-account-actions {
+  margin-top: 24px;
+}
+
+.amp-redesign .amp-project-channel-option {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  color: #101828;
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 52px minmax(0, 1fr) 20px;
+  padding: 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.amp-redesign .amp-project-channel-option:hover {
+  background: #f8fafc;
+  border-color: #b9c1ce;
+  transform: none;
+}
+
+.amp-redesign .amp-project-channel-option:focus-visible {
+  border-color: #175cd3;
+  box-shadow: 0 0 0 3px rgba(23, 92, 211, 0.14);
+  outline: 0;
+}
+
+.amp-redesign .amp-project-channel-option img {
+  border-radius: 12px;
+  height: 52px;
+  object-fit: contain;
+  width: 52px;
+}
+
+.amp-redesign .amp-project-channel-option span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.amp-redesign .amp-project-channel-option strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.amp-redesign .amp-project-channel-option small {
   color: #667085;
   font-size: 13px;
-  line-height: 1.6;
+}
+
+.amp-redesign .amp-project-channel-option > svg {
+  color: #98a2b3;
+  height: 18px;
+  width: 18px;
+}
+
+.amp-redesign .amp-project-channel-selected {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.amp-redesign .amp-project-channel-selected img {
+  border-radius: 12px;
+  height: 52px;
+  object-fit: contain;
+  width: 52px;
+}
+
+.amp-redesign .amp-project-channel-selected-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.amp-redesign .amp-project-channel-selected-copy strong {
+  color: #101828;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.amp-redesign .amp-project-channel-authorization {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.amp-redesign .amp-project-channel-permissions > strong {
+  color: #101828;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.amp-redesign .amp-project-channel-selected-copy p {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.amp-redesign .amp-project-channel-permissions {
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  padding: 15px 16px;
+}
+
+.amp-redesign .amp-project-channel-permissions ul {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.amp-redesign .amp-project-channel-permissions li {
+  align-items: center;
+  color: #475467;
+  display: flex;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.amp-redesign .amp-project-channel-permissions li svg {
+  color: #1570ef;
+  height: 16px;
+  width: 16px;
+}
+
+.amp-redesign .amp-project-channel-device {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 0 4px;
+  text-align: center;
+}
+
+.amp-redesign .amp-project-channel-device img {
+  border: 1px solid #eaecf0;
+  border-radius: 10px;
+  height: 224px;
+  width: 224px;
+}
+
+.amp-redesign .amp-project-channel-device strong {
+  color: #101828;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.amp-redesign .amp-project-channel-device small {
+  color: #667085;
+  font-size: 12px;
+}
+
+.amp-redesign .amp-project-channel-device-link {
+  color: #175cd3;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.amp-redesign .amp-project-channel-device-link:hover {
+  color: #004eeb;
+  text-decoration: underline;
+}
+
+.amp-redesign .amp-project-channel-account-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
   margin-top: 4px;
 }
 
-.amp-redesign .amp-project-invite-form {
-  align-items: end;
-  background: #ffffff;
+.amp-redesign .amp-member-action-more {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #344054;
+  display: inline-flex;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.amp-redesign .amp-member-action-more:hover {
+  background: #f2f4f7;
+  color: #101828;
+  transform: none;
+}
+
+.amp-redesign .amp-member-action-more:focus-visible {
+  box-shadow: 0 0 0 3px rgba(23, 92, 211, 0.14);
+  outline: 0;
+}
+
+.amp-redesign .amp-member-action-menu {
+  background: #fff;
   border: 1px solid #e4e7ec;
-  border-radius: 10px;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(240px, 1fr) 170px auto;
-  margin-top: 18px;
-  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.14);
+  min-width: 142px;
+  padding: 5px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
 }
 
-.amp-redesign .amp-project-invite-form label {
-  display: grid;
-  gap: 6px;
-}
-
-.amp-redesign .amp-project-invite-form label > span {
-  color: #475467;
-  font-size: 12px;
+.amp-redesign .amp-member-action-menu button {
+  align-items: center;
+  border-radius: 6px;
+  color: #344054;
+  display: flex;
+  font-size: 13px;
   font-weight: 600;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.amp-redesign .amp-member-action-menu button:hover {
+  background: #f2f4f7;
+  color: #101828;
+  transform: none;
+}
+
+.amp-redesign .amp-member-action-menu .amp-member-action-danger {
+  color: #d92d20;
+}
+
+.amp-redesign .amp-member-action-menu .amp-member-action-danger:hover {
+  background: #fef3f2;
+  color: #b42318;
+}
+
+.amp-redesign .amp-member-action-menu svg {
+  height: 15px;
+  width: 15px;
 }
 
 .amp-redesign .amp-project-customize {
@@ -4825,7 +5209,20 @@
     display: none;
   }
 
-  .amp-redesign .amp-project-invite-form {
-    grid-template-columns: 1fr;
+  .amp-redesign .amp-project-integration-main {
+    align-items: start;
+    gap: 16px 12px;
+    grid-template-areas:
+      "app actions"
+      "account account"
+      "creator creator"
+      "created created";
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 14px;
   }
+
+  .amp-redesign .amp-project-integration-actions {
+    padding-top: 3px;
+  }
+
 }

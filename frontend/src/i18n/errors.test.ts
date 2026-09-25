@@ -29,3 +29,20 @@ test("browser errors respect supported languages and use English for missing or 
     else Reflect.deleteProperty(globalThis, "document");
   }
 });
+
+test("channel authorization configuration errors are localized", () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "document");
+  try {
+    Object.defineProperty(globalThis, "document", {
+      configurable: true,
+      value: { documentElement: { lang: "zh-CN" } },
+    });
+    assert.equal(
+      apiError("xiaohongshu authorization is not configured").message,
+      "尚未配置小红书授权，请联系管理员完成开放平台配置",
+    );
+  } finally {
+    if (original) Object.defineProperty(globalThis, "document", original);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});

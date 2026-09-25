@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,32 @@ class ProjectMemberInvite(BaseModel):
 
 class ProjectMemberRole(BaseModel):
     role: str
+
+
+class ProjectChannelAccount(BaseModel):
+    id: str
+    project_id: str
+    platform: Literal["xiaohongshu", "douyin"]
+    account_name: str
+    platform_user_id: str = ""
+    profile_url: str = ""
+    notes: str = ""
+    created_by_user_id: str = ""
+    creator_name: str = ""
+    creator_avatar_url: str = ""
+    authorization_status: str = "active"
+    token_expires_at: str = ""
+    refresh_token_expires_at: str = ""
+    created_at: str
+    updated_at: str
+
+
+class ProjectChannelAuthorizationRequest(BaseModel):
+    platform: Literal["xiaohongshu", "douyin"]
+
+
+class ProjectChannelAuthorizationPollRequest(BaseModel):
+    state: str = Field(min_length=1)
 
 
 class PublishTask(BaseModel):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import re
+import tempfile
 import uuid
-import aiofiles
 from fastapi import APIRouter, UploadFile, File, HTTPException, Query, Depends, Form, Request
 from pydantic import BaseModel
 from app.engines.case_library.models import CaseUpdate
@@ -18,8 +18,15 @@ from app.auth.dependencies import (
     get_optional_user,
 )
 from app.config import (
-    MEDIA_ROOT, ALLOWED_VIDEO_EXTENSIONS, ALLOWED_IMAGE_EXTENSIONS,
+    ALLOWED_VIDEO_EXTENSIONS, ALLOWED_IMAGE_EXTENSIONS,
     MAX_VIDEO_SIZE_BYTES, MAX_IMAGE_SIZE_BYTES,
+)
+from app.media_storage import (
+    delete_media,
+    guess_content_type,
+    materialize_media,
+    media_key_from_url,
+    put_media_bytes,
 )
 
 router = APIRouter(prefix="/api/v1/case_library", tags=["case_library"])
@@ -35,11 +42,8 @@ def _sanitize_filename(name: str) -> str:
     return re.sub(r"[^\w.\-]", "_", name)
 
 
-def _media_dirs(owner_id: str, media_type: str) -> tuple[str, str]:
-    sub = f"users/{owner_id}"
-    dir_path = os.path.join(MEDIA_ROOT, sub, media_type)
-    os.makedirs(dir_path, exist_ok=True)
-    return dir_path, f"{sub}/{media_type}"
+def _media_prefix(owner_id: str, media_type: str) -> str:
+    return f"users/{owner_id}/{media_type}"
 
 
 @router.get("/health")
@@ -180,7 +184,6 @@ async def create_case_item(
 
     owner_id = current_user["id"]
 
-    os_imported = __import__("os")
     video_url = ""
     image_urls: list[str] = []
 
@@ -193,17 +196,18 @@ async def create_case_item(
         content_bytes = await video.read()
         if len(content_bytes) > MAX_VIDEO_SIZE_BYTES:
             raise HTTPException(status_code=413, detail=f"Video too large. Max: {MAX_VIDEO_SIZE_BYTES // 1024 // 1024}MB")
-        videos_dir, url_prefix = _media_dirs(owner_id, "videos")
+        prefix = _media_prefix(owner_id, "videos")
         safe_name = f"{uuid.uuid4().hex[:12]}_{_sanitize_filename(video.filename)}"
-        file_path = os_imported.path.join(videos_dir, safe_name)
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(content_bytes)
-        video_url = f"{url_prefix}/{safe_name}"
+        video_url = put_media_bytes(
+            f"{prefix}/{safe_name}",
+            content_bytes,
+            content_type=video.content_type or guess_content_type(safe_name),
+        )
 
     elif content_type == "image_text":
         if images is None or len(images) == 0:
             raise HTTPException(status_code=400, detail="At least one image is required for image_text cases")
-        images_dir, url_prefix = _media_dirs(owner_id, "images")
+        prefix = _media_prefix(owner_id, "images")
         for img in images:
             if not img.filename:
                 continue
@@ -214,10 +218,11 @@ async def create_case_item(
             if len(content_bytes) > MAX_IMAGE_SIZE_BYTES:
                 raise HTTPException(status_code=413, detail=f"Image too large. Max: {MAX_IMAGE_SIZE_BYTES // 1024 // 1024}MB")
             safe_name = f"{uuid.uuid4().hex[:12]}_{_sanitize_filename(img.filename)}"
-            file_path = os_imported.path.join(images_dir, safe_name)
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content_bytes)
-            image_urls.append(f"{url_prefix}/{safe_name}")
+            image_urls.append(put_media_bytes(
+                f"{prefix}/{safe_name}",
+                content_bytes,
+                content_type=img.content_type or guess_content_type(safe_name),
+            ))
 
     try:
         case = create_case(
@@ -275,23 +280,12 @@ async def replace_case_media(
     current_user=Depends(get_current_user),
 ):
     case = _check_ownership(case_id, current_user)
-    os_imported = __import__("os")
-
     # Delete old media files
-    if case.video_url:
-        old = os_imported.path.join(MEDIA_ROOT, case.video_url)
-        try:
-            if os_imported.path.exists(old):
-                os_imported.remove(old)
-        except OSError:
-            pass
+    if case.video_url and (key := media_key_from_url(case.video_url)):
+        delete_media(key)
     for img_url in case.image_urls:
-        old = os_imported.path.join(MEDIA_ROOT, img_url)
-        try:
-            if os_imported.path.exists(old):
-                os_imported.remove(old)
-        except OSError:
-            pass
+        if key := media_key_from_url(img_url):
+            delete_media(key)
 
     video_url = ""
     image_urls: list[str] = []
@@ -303,15 +297,16 @@ async def replace_case_media(
         content_bytes = await video.read()
         if len(content_bytes) > MAX_VIDEO_SIZE_BYTES:
             raise HTTPException(status_code=413, detail="Video too large")
-        videos_dir, url_prefix = _media_dirs(case.owner_id, "videos")
+        prefix = _media_prefix(case.owner_id, "videos")
         safe_name = f"{uuid.uuid4().hex[:12]}_{_sanitize_filename(video.filename)}"
-        file_path = os_imported.path.join(videos_dir, safe_name)
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(content_bytes)
-        video_url = f"{url_prefix}/{safe_name}"
+        video_url = put_media_bytes(
+            f"{prefix}/{safe_name}",
+            content_bytes,
+            content_type=video.content_type or guess_content_type(safe_name),
+        )
 
     if images is not None and len(images) > 0:
-        images_dir, url_prefix = _media_dirs(case.owner_id, "images")
+        prefix = _media_prefix(case.owner_id, "images")
         for img in images:
             if not img.filename:
                 continue
@@ -322,10 +317,11 @@ async def replace_case_media(
             if len(content_bytes) > MAX_IMAGE_SIZE_BYTES:
                 raise HTTPException(status_code=413, detail="Image too large")
             safe_name = f"{uuid.uuid4().hex[:12]}_{_sanitize_filename(img.filename)}"
-            file_path = os_imported.path.join(images_dir, safe_name)
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content_bytes)
-            image_urls.append(f"{url_prefix}/{safe_name}")
+            image_urls.append(put_media_bytes(
+                f"{prefix}/{safe_name}",
+                content_bytes,
+                content_type=img.content_type or guess_content_type(safe_name),
+            ))
 
     updates = {}
     if video_url:
@@ -353,21 +349,11 @@ async def delete_case_item(
     if not deleted:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    os_imported = __import__("os")
-    if case.video_url:
-        file_path = os_imported.path.join(MEDIA_ROOT, case.video_url)
-        try:
-            if os_imported.path.exists(file_path):
-                os_imported.remove(file_path)
-        except OSError:
-            pass
+    if case.video_url and (key := media_key_from_url(case.video_url)):
+        delete_media(key)
     for img_url in case.image_urls:
-        file_path = os_imported.path.join(MEDIA_ROOT, img_url)
-        try:
-            if os_imported.path.exists(file_path):
-                os_imported.remove(file_path)
-        except OSError:
-            pass
+        if key := media_key_from_url(img_url):
+            delete_media(key)
 
     return success_response("Case deleted")
 
@@ -388,15 +374,21 @@ async def analyze_case_item(
 
     # Build image paths from existing case media
     image_paths: list[str] = []
+    cleanup_paths: list[str] = []
     for img_url in case.image_urls:
-        full = os.path.join(MEDIA_ROOT, img_url)
-        if os.path.exists(full):
-            image_paths.append(full)
+        key = media_key_from_url(img_url)
+        if not key:
+            continue
+        try:
+            path, should_cleanup = materialize_media(key)
+        except (FileNotFoundError, ValueError):
+            continue
+        image_paths.append(path)
+        if should_cleanup:
+            cleanup_paths.append(path)
 
     # If new images were uploaded for analysis, save them temporarily and add to paths
     if images:
-        tmp_dir = os.path.join(MEDIA_ROOT, "analysis_tmp")
-        os.makedirs(tmp_dir, exist_ok=True)
         for img in images:
             if not img.filename:
                 continue
@@ -407,16 +399,18 @@ async def analyze_case_item(
             if len(content_bytes) > MAX_IMAGE_SIZE_BYTES:
                 continue
             safe_name = f"{uuid.uuid4().hex[:12]}_{_sanitize_filename(img.filename)}"
-            file_path = os.path.join(tmp_dir, safe_name)
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content_bytes)
+            fd, file_path = tempfile.mkstemp(
+                prefix="marventa-analysis-",
+                suffix=os.path.splitext(safe_name)[1],
+            )
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(content_bytes)
             image_paths.append(file_path)
+            cleanup_paths.append(file_path)
 
     video_path = ""
     if case.video_url:
-        full_video = os.path.join(MEDIA_ROOT, case.video_url)
-        if os.path.exists(full_video):
-            video_path = case.video_url
+        video_path = case.video_url
 
     update_case_ai(case_id, "analyzing")
     analyze_async(
@@ -427,6 +421,7 @@ async def analyze_case_item(
         tags=case.tags,
         image_paths=image_paths if image_paths else None,
         video_url=video_path,
+        cleanup_paths=cleanup_paths,
     )
     return success_response("AI analysis started", {"status": "analyzing"})
 
